@@ -90,3 +90,12 @@ def test_mixed_language_fallback_no_crash() -> None:
     )
     ents = extract_spacy(body)
     assert isinstance(ents, list)
+
+
+def test_spacy_entity_values_have_no_surrounding_whitespace() -> None:
+    # N9a regression: spaCy ent.text can include surrounding newlines when an entity
+    # spans a line boundary (e.g. 'sam\n\n' in the pilot histogram).
+    body = "Barack Obama visited Berlin."
+    ents = extract_spacy(body, lang="en")
+    for e in ents:
+        assert e.value == e.value.strip(), f"value {e.value!r} has surrounding whitespace"

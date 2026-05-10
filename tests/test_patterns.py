@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from zkm_ner._types import Entity
 from zkm_ner.patterns import (
     extract_emails,
     extract_github,
@@ -182,3 +183,18 @@ def test_default_gazetteer_loads() -> None:
     entries = load_gazetteer()
     assert len(entries) > 0
     assert all("canonical" in e for e in entries)
+
+
+# ---------------------------------------------------------------------------
+# N9a regression — value whitespace normalization
+# ---------------------------------------------------------------------------
+
+def test_entity_value_strips_trailing_newlines() -> None:
+    # Pilot surfaced values like 'sam\n\n' from spaCy ent.text spanning line ends.
+    e = Entity("person", "sam\n\n")
+    assert e.value == "sam"
+
+
+def test_entity_value_strips_leading_and_trailing_whitespace() -> None:
+    e = Entity("person", "  \n Alice Smith \n ")
+    assert e.value == "Alice Smith"

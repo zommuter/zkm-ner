@@ -22,5 +22,10 @@ class Entity:
     start: int = field(default=-1, compare=False, repr=False)
     end: int = field(default=-1, compare=False, repr=False)
 
+    def __post_init__(self) -> None:
+        # spaCy ent.text can include surrounding newlines when an entity spans
+        # a line boundary; strip unconditionally to keep values clean.
+        self.value = self.value.strip()
+
     def as_dict(self) -> dict:
         return {"type": self.type, "value": self.value}
