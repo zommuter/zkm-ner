@@ -75,8 +75,8 @@ def _process_file(
     forced_lang: str | None,
     gazetteer_path: str | None,
 ) -> None:
+    import hashlib
     import frontmatter
-    from zkm.hashing import sha256_file
 
     try:
         post = frontmatter.load(str(md_path))
@@ -84,7 +84,7 @@ def _process_file(
         return
 
     body = post.content
-    body_sha256 = sha256_file(md_path)
+    body_sha256 = hashlib.sha256(body.encode()).hexdigest()
 
     cached = cache.get(body_sha256, model_name=model_name, model_version=model_version)
     if cached is not None:
