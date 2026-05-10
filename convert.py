@@ -109,3 +109,64 @@ def _process_file(
         fields={"entities": entities},
         emitted_by=PLUGIN_NAME,
     )
+
+
+# ---------------------------------------------------------------------------
+
+
+def scrub(
+    store_path: Path,
+    config: dict,  # noqa: ARG001
+    *,
+    dry_run: bool = True,
+    verbose: bool = False,
+    progress=None,
+) -> dict[str, int]:
+    """Remove stoplist entities from existing frontmatter (retroactive cleanup).
+
+    Does NOT touch amendment attribution sidecars (<md>.amendments.json).
+    Idempotent: second run with dry_run=False reports files_changed=0.
+    """
+    import frontmatter
+
+    from zkm.atomic import write_atomic
+    from zkm_ner.textfilter import _STOPLIST
+
+    md_files = [
+        p for p in sorted(store_path.rglob("*.md"))
+        if not any(part.startswith(".") for part in p.relative_to(store_path).parts[:-1])
+    ]
+    total = len(md_files)
+    files_changed = 0
+    entities_removed = 0
+
+    for i, md_path in enumerate(md_files, 1):
+        if progress:
+            progress(i, total, str(md_path.relative_to(store_path)))
+        try:
+            post = frontmatter.load(str(md_path))
+        except Exception:
+            continue
+
+        existing = post.metadata.get("entities")
+        if not existing:
+            continue
+
+        cleaned = [
+            e for e in existing
+            if not (isinstance(e, dict) and e.get("value", "").strip().lower() in _STOPLIST)
+        ]
+        removed = len(existing) - len(cleaned)
+        if removed == 0:
+            continue
+
+        entities_removed += removed
+        files_changed += 1
+        if verbose:
+            print(f"  {md_path.relative_to(store_path)}  (-{removed} entities)", file=sys.stderr)
+
+        if not dry_run:
+            post.metadata["entities"] = cleaned
+            write_atomic(md_path, frontmatter.dumps(post))
+
+    return {"files_scanned": total, "files_changed": files_changed, "entities_removed": entities_removed}

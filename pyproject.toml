@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zkm-ner"
-version = "0.1.0"
+version = "0.2.0"
 description = "zkm amender plugin: NER entity extraction into md frontmatter"
 requires-python = ">=3.14"
 dependencies = [
@@ -14,7 +14,7 @@ dependencies = [
     "phonenumbers>=8.13",
     "python-frontmatter>=1.1",
     "spacy>=3.7",
-    "zkm>=0.2.0,<0.3.0",
+    "zkm>=0.3.0,<0.4.0",
 ]
 
 [project.optional-dependencies]
