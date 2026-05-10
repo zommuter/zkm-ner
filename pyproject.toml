@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zkm-ner"
+version = "0.1.0"
+description = "zkm amender plugin: NER entity extraction into md frontmatter"
+requires-python = ">=3.14"
+dependencies = [
+    "langdetect>=1.0.9",
+    "phonenumbers>=8.13",
+    "python-frontmatter>=1.1",
+    "spacy>=3.7",
+    "zkm>=0.2.0,<0.3.0",
+]
+
+[project.optional-dependencies]
+gliner = [
+    "gliner>=0.2",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zkm_ner"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.uv.sources]
+zkm = { path = "../..", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

@@ -1,0 +1,31 @@
+name: ner
+version: 0.1.0
+kind: amender
+description: >
+  Amender plugin: runs NER (spaCy + pattern overlay) over md bodies and merges
+  entity mentions into frontmatter via zkm.amendments. Uses an extraction-cache
+  keyed by (body sha256, extractor, model, version) so re-runs on unchanged
+  documents are zero-cost.
+
+creates_dirs: []
+
+config:
+  ZKM_NER_MODEL:
+    required: false
+    default: "spacy"
+    description: >
+      NER backend: "spacy" (default) uses de_core_news_sm + en_core_web_sm with
+      doc-level langdetect routing. "gliner" uses gliner-multilingual-v2.1 and
+      requires `pip install zkm-ner[gliner]`.
+  ZKM_NER_LANG:
+    required: false
+    default: ""
+    description: >
+      Force a language code ("de" or "en") for all documents, skipping langdetect.
+      Leave empty for automatic doc-level detection.
+  ZKM_NER_GAZETTEER:
+    required: false
+    default: ""
+    description: >
+      Path to a YAML gazetteer file for org canonicalisation. When empty the
+      bundled gazetteers/orgs.yaml is used.
