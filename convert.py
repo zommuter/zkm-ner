@@ -12,6 +12,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+_plugin_root = Path(__file__).parent
+sys.path.insert(0, str(_plugin_root / "src"))
+_venv_site = list((_plugin_root / ".venv").glob("lib/python*/site-packages"))
+if _venv_site:
+    sys.path.insert(0, str(_venv_site[0]))
+
 from zkm.amendments import apply_queue, emit
 
 PLUGIN_NAME = "ner"
