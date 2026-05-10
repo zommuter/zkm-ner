@@ -11,6 +11,7 @@ from __future__ import annotations
 from zkm_ner._types import Entity  # re-export
 from zkm_ner.patterns import extract_all as _extract_patterns
 from zkm_ner.spacy_backend import extract_spacy
+from zkm_ner.textfilter import drop_stoplist, strip_markdown_artefacts
 
 __all__ = ["Entity", "extract"]
 
@@ -27,6 +28,7 @@ def extract(
     Pattern overlay runs first; any NER span that overlaps a pattern span is
     dropped (patterns win).  Final list is deduped on (type, value).
     """
+    body = strip_markdown_artefacts(body)
     pattern_ents = _extract_patterns(body, gazetteer_path=gazetteer_path)
 
     if model == "gliner":
@@ -42,7 +44,7 @@ def extract(
             continue
         merged.append(ner_ent)
 
-    return _dedup(merged)
+    return _dedup(drop_stoplist(merged))
 
 
 # ---------------------------------------------------------------------------
