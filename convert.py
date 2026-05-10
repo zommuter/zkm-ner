@@ -30,7 +30,10 @@ def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
     forced_lang = config.get("ZKM_NER_LANG", "").strip() or None
     gazetteer_path = config.get("ZKM_NER_GAZETTEER", "").strip() or None
 
+    from zkm_ner.version import model_version
+
     cache = ExtractionCache(store_path, extractor_name=PLUGIN_NAME)
+    version = model_version(model_name)
 
     md_files = sorted(store_path.rglob("*.md"))
     total = len(md_files)
@@ -42,6 +45,7 @@ def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
             cache=cache,
             extract=extract,
             model_name=model_name,
+            model_version=version,
             forced_lang=forced_lang,
             gazetteer_path=gazetteer_path,
         )
@@ -67,6 +71,7 @@ def _process_file(
     cache,
     extract,
     model_name: str,
+    model_version: str,
     forced_lang: str | None,
     gazetteer_path: str | None,
 ) -> None:
@@ -81,13 +86,13 @@ def _process_file(
     body = post.content
     body_sha256 = sha256_file(md_path)
 
-    cached = cache.get(body_sha256, model_name=model_name)
+    cached = cache.get(body_sha256, model_name=model_name, model_version=model_version)
     if cached is not None:
         entities = cached
     else:
         lang = forced_lang or post.get("lang") or None
         entities = [e.as_dict() for e in extract(body, lang=lang, gazetteer_path=gazetteer_path, model=model_name)]
-        cache.put(body_sha256, entities, model_name=model_name)
+        cache.put(body_sha256, entities, model_name=model_name, model_version=model_version)
 
     if not entities:
         return
