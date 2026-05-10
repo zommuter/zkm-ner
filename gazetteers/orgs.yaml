@@ -1,0 +1,79 @@
+# Default org gazetteer for zkm-ner.
+# Each entry maps aliases → canonical name.
+# Edit to add your own organisations; aliases are matched case-insensitively
+# with word boundaries so short terms (e.g. "Post") don't fire inside words.
+entries:
+  - canonical: "Proton AG"
+    type: org
+    aliases:
+      - Proton AG
+      - Proton
+      - ProtonMail
+      - ProtonVPN
+      - Proton Mail
+
+  - canonical: "Swisscom"
+    type: org
+    aliases:
+      - Swisscom
+
+  - canonical: "PostFinance AG"
+    type: org
+    aliases:
+      - PostFinance AG
+      - PostFinance
+      - Post Finance
+
+  - canonical: "Swiss Post"
+    type: org
+    aliases:
+      - Die Post
+      - Swiss Post
+      - Post CH AG
+      - Post CH
+
+  - canonical: "SBB CFF FFS"
+    type: org
+    aliases:
+      - SBB CFF FFS
+      - SBB
+      - CFF
+      - FFS
+      - Swiss Federal Railways
+
+  - canonical: "Deutsche Telekom"
+    type: org
+    aliases:
+      - Deutsche Telekom
+      - Telekom
+      - T-Online
+      - T-Mobile Deutschland
+
+  - canonical: "Stadtwerke Konstanz"
+    type: org
+    aliases:
+      - Stadtwerke Konstanz GmbH
+      - Stadtwerke Konstanz
+
+  - canonical: "Google LLC"
+    type: org
+    aliases:
+      - Google LLC
+      - Google
+
+  - canonical: "Amazon Web Services"
+    type: org
+    aliases:
+      - Amazon Web Services
+      - AWS
+
+  - canonical: "Cloudflare Inc."
+    type: org
+    aliases:
+      - Cloudflare
+
+  - canonical: "Hetzner Online GmbH"
+    type: org
+    aliases:
+      - Hetzner Online GmbH
+      - Hetzner

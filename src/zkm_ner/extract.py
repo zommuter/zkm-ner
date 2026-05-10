@@ -1,24 +1,18 @@
 """Entity extractor — pattern overlay + spaCy NER (+ optional GLiNER).
 
-Implemented in N2. This stub satisfies the import contract for the scaffold.
+Public API:
+    extract(body, *, lang, model, gazetteer_path) -> list[Entity]
+
+Entity is re-exported for callers that only import from this module.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from zkm_ner._types import Entity  # re-export
+from zkm_ner.patterns import extract_all as _extract_patterns
+from zkm_ner.spacy_backend import extract_spacy
 
-
-@dataclass
-class Entity:
-    type: str
-    value: str
-    # optional extras written to the amendment record as-is
-    extra: dict = field(default_factory=dict)
-
-    def as_dict(self) -> dict:
-        d: dict = {"type": self.type, "value": self.value}
-        d.update(self.extra)
-        return d
+__all__ = ["Entity", "extract"]
 
 
 def extract(
@@ -28,9 +22,41 @@ def extract(
     model: str = "spacy",
     gazetteer_path: str | None = None,
 ) -> list[Entity]:
-    """Return entity mentions extracted from *body*.
+    """Return deduplicated entity mentions extracted from *body*.
 
-    Not yet implemented — returns empty list until N2 lands.
+    Pattern overlay runs first; any NER span that overlaps a pattern span is
+    dropped (patterns win).  Final list is deduped on (type, value).
     """
-    _ = (body, lang, model, gazetteer_path)
-    return []
+    pattern_ents = _extract_patterns(body, gazetteer_path=gazetteer_path)
+
+    if model == "gliner":
+        from zkm_ner.gliner_backend import extract_gliner
+        ner_ents = extract_gliner(body, lang=lang)
+    else:
+        ner_ents = extract_spacy(body, lang=lang)
+
+    pattern_spans = [(e.start, e.end) for e in pattern_ents if e.start >= 0]
+    merged = list(pattern_ents)
+    for ner_ent in ner_ents:
+        if ner_ent.start >= 0 and _overlaps_any(ner_ent.start, ner_ent.end, pattern_spans):
+            continue
+        merged.append(ner_ent)
+
+    return _dedup(merged)
+
+
+# ---------------------------------------------------------------------------
+
+def _overlaps_any(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
+    return any(not (end <= s or start >= e) for s, e in spans)
+
+
+def _dedup(entities: list[Entity]) -> list[Entity]:
+    seen: set[tuple[str, str]] = set()
+    result = []
+    for e in entities:
+        key = (e.type, e.value)
+        if key not in seen:
+            seen.add(key)
+            result.append(e)
+    return result
