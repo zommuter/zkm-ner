@@ -40,10 +40,13 @@ _SALUTATION_BLOCKLIST: frozenset[str] = frozenset({
     "hallo tobias",
     "hallo tobias kienzler",
     "hello tobias",
+    "lieber tobias",
+    "hallo alexander",
     "hallo herr kienzler",
     "hallo herr",
     "guten tag herr kienzler",
     "guten tag herr",
+    "guten morgen herr",
     "lieber herr",
     # Pronoun / phrase fragments
     "du dich",
