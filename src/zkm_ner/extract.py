@@ -11,7 +11,7 @@ from __future__ import annotations
 from zkm_ner._types import Entity  # re-export
 from zkm_ner.patterns import extract_all as _extract_patterns
 from zkm_ner.spacy_backend import extract_spacy
-from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_salutation_blocklist, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
+from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_salutation_blocklist, drop_section_link_artefacts, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
 
 __all__ = ["Entity", "extract"]
 
@@ -46,7 +46,7 @@ def extract(
             continue
         merged.append(ner_ent)
 
-    return _dedup(drop_salutation_blocklist(drop_structural_artefacts(drop_commonnoun_stoplist(drop_stoplist(merged)))))
+    return _dedup(drop_section_link_artefacts(drop_salutation_blocklist(drop_structural_artefacts(drop_commonnoun_stoplist(drop_stoplist(merged))))))
 
 
 # ---------------------------------------------------------------------------

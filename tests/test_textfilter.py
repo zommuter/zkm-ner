@@ -1,9 +1,9 @@
-"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist; N9c-8: structural artefacts; N9f: salutation blocklist."""
+"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist; N9c-8: structural artefacts; N9c-10: section link artefacts; N9f: salutation blocklist."""
 
 import pytest
 
 from zkm_ner._types import Entity
-from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_salutation_blocklist, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
+from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_salutation_blocklist, drop_section_link_artefacts, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
 
 
 # ---------------------------------------------------------------------------
@@ -173,3 +173,35 @@ def test_drop_salutation_blocklist_keeps_real_names():
 
 def test_drop_salutation_blocklist_empty_list():
     assert drop_salutation_blocklist([]) == []
+
+
+# ---------------------------------------------------------------------------
+# drop_section_link_artefacts (N9c-10 — class 7 pollution)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("value", [
+    "Section 2]",
+    "Section 3]\n\n",
+    "Section 5]\n\n++ Section 6",
+    "Section 6]\n\n++ Footer\n\nSocial Media",
+    "Section 10]",
+])
+def test_drop_section_link_artefacts_removes_artifacts(value):
+    """Class 7: broken markdown link-target fragments starting with 'Section N]'."""
+    entities = [Entity(type="misc", value=value)]
+    assert drop_section_link_artefacts(entities) == []
+
+
+def test_drop_section_link_artefacts_keeps_legitimate_references():
+    """Section references without closing bracket are ambiguous — must not be dropped."""
+    real = [
+        Entity(type="misc", value="Section 1"),
+        Entity(type="misc", value="Section 101"),
+        Entity(type="misc", value="Section 5.1 & 6.5"),
+        Entity(type="org", value="Google"),
+    ]
+    assert drop_section_link_artefacts(real) == real
+
+
+def test_drop_section_link_artefacts_empty_list():
+    assert drop_section_link_artefacts([]) == []

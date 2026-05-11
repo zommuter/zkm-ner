@@ -11,6 +11,10 @@ Post-extraction:  drop_stoplist(entities) -> list[Entity]
 Post-extraction:  drop_structural_artefacts(entities) -> list[Entity]
     Removes entities whose value consists solely of pipe characters and
     whitespace — inline empty table cells within data rows (class 5 pollution).
+
+Post-extraction:  drop_section_link_artefacts(entities) -> list[Entity]
+    Removes entities whose value begins with "Section N]" — broken markdown
+    link-target fragments left by the email→markdown converter (class 7 pollution).
 """
 
 from __future__ import annotations
@@ -103,3 +107,13 @@ _RE_STRUCTURAL_ARTEFACT = re.compile(r"^[\s|]+$")
 def drop_structural_artefacts(entities: list[Entity]) -> list[Entity]:
     """Remove entities whose value is only pipe characters and whitespace (e.g. '| |', '| | |')."""
     return [e for e in entities if not _RE_STRUCTURAL_ARTEFACT.match(e.value)]
+
+
+# "Section N]" fragments from broken markdown link parsing in zkm-eml (class 7 pollution).
+# Anchored at start; trailing content (newlines, continued markdown) is captured by the open match.
+_RE_SECTION_LINK_ARTIFACT = re.compile(r"^Section\s+\d+\]")
+
+
+def drop_section_link_artefacts(entities: list[Entity]) -> list[Entity]:
+    """Remove entities whose value begins with 'Section N]' — broken link-target artifacts."""
+    return [e for e in entities if not _RE_SECTION_LINK_ARTIFACT.match(e.value)]
