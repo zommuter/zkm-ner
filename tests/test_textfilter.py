@@ -1,9 +1,9 @@
-"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist."""
+"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist; N9c-8: structural artefacts."""
 
 import pytest
 
 from zkm_ner._types import Entity
-from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_stoplist, strip_markdown_artefacts
+from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
 
 
 # ---------------------------------------------------------------------------
@@ -94,3 +94,28 @@ def test_drop_commonnoun_stoplist_keeps_proper_nouns():
     ]
     result = drop_commonnoun_stoplist(entities)
     assert len(result) == 2
+
+
+# ---------------------------------------------------------------------------
+# drop_structural_artefacts (N9c-8)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("value", ["| |", "| | |", "|  |", "||", " | ", "|"])
+def test_drop_structural_artefacts_removes_pipe_whitespace(value):
+    """Pilot class 5: inline empty table cells composed of pipes and whitespace only."""
+    entities = [Entity(type="person", value=value)]
+    assert drop_structural_artefacts(entities) == []
+
+
+def test_drop_structural_artefacts_keeps_real_values():
+    """Values with letters or digits must not be dropped."""
+    entities = [
+        Entity(type="person", value="Alice"),
+        Entity(type="org", value="| Alice |"),
+        Entity(type="misc", value="SBB"),
+    ]
+    assert drop_structural_artefacts(entities) == entities
+
+
+def test_drop_structural_artefacts_empty_list():
+    assert drop_structural_artefacts([]) == []

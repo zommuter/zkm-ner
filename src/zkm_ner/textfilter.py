@@ -7,6 +7,10 @@ Pre-strip:  strip_markdown_artefacts(body) -> str
 Post-extraction:  drop_stoplist(entities) -> list[Entity]
     Removes entities whose value matches a closed-set of email header field
     names and subject-line prefixes (class 2+3 pollution).
+
+Post-extraction:  drop_structural_artefacts(entities) -> list[Entity]
+    Removes entities whose value consists solely of pipe characters and
+    whitespace — inline empty table cells within data rows (class 5 pollution).
 """
 
 from __future__ import annotations
@@ -58,3 +62,12 @@ def drop_stoplist(entities: list[Entity]) -> list[Entity]:
 def drop_commonnoun_stoplist(entities: list[Entity]) -> list[Entity]:
     """Remove entities matching the common-noun/abbreviation closed set (type-agnostic, case-insensitive)."""
     return [e for e in entities if e.value.strip().lower() not in _COMMONNOUN_STOPLIST]
+
+
+# Pipe-only / whitespace-only entity values from inline empty table cells (class 5 pollution).
+_RE_STRUCTURAL_ARTEFACT = re.compile(r"^[\s|]+$")
+
+
+def drop_structural_artefacts(entities: list[Entity]) -> list[Entity]:
+    """Remove entities whose value is only pipe characters and whitespace (e.g. '| |', '| | |')."""
+    return [e for e in entities if not _RE_STRUCTURAL_ARTEFACT.match(e.value)]

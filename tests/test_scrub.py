@@ -167,6 +167,32 @@ def test_scrub_isolated_pos_removes_common_noun(tmp_path):
     assert "Alice" in values
 
 
+def test_scrub_drops_structural_artefact_entities(tmp_path):
+    """Entities with pipe-only values (e.g. '| |') are removed by scrub."""
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    md = make_md(
+        store / "notes", "doc.md",
+        body="Hello",
+        entities=[
+            _entity("person", "| |"),
+            _entity("person", "| | |"),
+            _entity("org", "PayPal"),
+        ],
+    )
+
+    stats = scrub(store, {}, dry_run=False)
+
+    assert stats["files_changed"] == 1
+    assert stats["entities_removed"] == 2
+    remaining = _load_entities(md)
+    values = [e["value"] for e in remaining]
+    assert "| |" not in values
+    assert "| | |" not in values
+    assert "PayPal" in values
+
+
 def test_scrub_isolated_pos_keeps_multiword(tmp_path):
     """Multi-word entities bypass the isolated POS check and are not removed."""
     from convert import scrub
