@@ -15,6 +15,7 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 
 
@@ -68,7 +69,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="zkm-ner pilot analysis")
     parser.add_argument("--store", default="", help="Store path (default: $ZKM_STORE or ~/knowledge)")
     parser.add_argument("--top", type=int, default=20, help="Top-N values per type (default: 20)")
-    parser.add_argument("--review", default="", help="Write suspicious entities to this JSONL (default: <store>/.zkm-state/ner-pilot-review.jsonl)")
+    parser.add_argument("--review", default="", help="Write suspicious entities to this JSONL (default: <store>/.zkm-state/ner-pilot-review-YYYYMMDD-HHMM.jsonl)")
     args = parser.parse_args(argv)
 
     import os
@@ -79,7 +80,8 @@ def main(argv: list[str] | None = None) -> None:
         print(f"ERROR: store not found: {store}", file=sys.stderr)
         sys.exit(1)
 
-    review_path = Path(args.review) if args.review else store / ".zkm-state" / "ner-pilot-review.jsonl"
+    ts = datetime.now().strftime("%Y%m%d-%H%M")
+    review_path = Path(args.review) if args.review else store / ".zkm-state" / f"ner-pilot-review-{ts}.jsonl"
 
     # -----------------------------------------------------------------------
     # Scan

@@ -8,7 +8,7 @@
 # Defaults:
 #   --store   $ZKM_STORE or ~/knowledge
 #   --top     20
-#   --review  <store>/.zkm-state/ner-pilot-review.jsonl
+#   --review  <store>/.zkm-state/ner-pilot-review-YYYYMMDD-HHMM.jsonl
 
 set -euo pipefail
 
