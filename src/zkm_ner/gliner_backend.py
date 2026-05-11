@@ -4,6 +4,14 @@ Install with: pip install zkm-ner[gliner]
 Activate with: ZKM_NER_MODEL=gliner
 
 Output schema is identical to the spaCy backend so callers are backend-agnostic.
+
+**Truncation limit:** urchade/gliner_multi-v2.1 truncates input at 384 tokens
+(~2800 chars). Document content beyond that point is silently ignored.
+A/B testing against spaCy (N9d-α, 2026-05-11) showed that on short emails
+(<300 tokens) GLiNER produces +14% more entities than spaCy, not fewer —
+the apparent FP reduction seen on long emails is a truncation artifact.
+Recommended only for short-document corpora; spaCy is the correct default
+for mixed-length stores such as mail archives.
 """
 
 from __future__ import annotations
