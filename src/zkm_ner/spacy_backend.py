@@ -68,5 +68,5 @@ def extract_spacy(body: str, *, lang: str | None = None) -> list[Entity]:
         etype = _LABEL_MAP.get(ent.label_)
         if etype is None:
             continue
-        results.append(Entity(etype, ent.text, start=ent.start_char, end=ent.end_char))
+        results.append(Entity(etype, ent.text, start=ent.start_char, end=ent.end_char, root_pos=ent.root.pos_))
     return results

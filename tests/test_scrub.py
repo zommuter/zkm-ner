@@ -110,3 +110,78 @@ def test_scrub_dry_run_does_not_write(tmp_path):
     assert stats["files_changed"] == 1
     assert stats["entities_removed"] == 1
     assert md.read_text(encoding="utf-8") == original_text
+
+
+# ---------------------------------------------------------------------------
+# N9c-4: commonnoun stoplist + isolated POS predicate in scrub
+# ---------------------------------------------------------------------------
+
+
+def test_scrub_drops_commonnoun_stoplist_entities(tmp_path):
+    """Entities in _COMMONNOUN_STOPLIST (e.g. 'Du', 'EUR') are removed by scrub."""
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    md = make_md(
+        store / "notes", "doc.md",
+        body="Hello",
+        entities=[
+            _entity("person", "Du"),
+            _entity("misc", "EUR"),
+            _entity("person", "Alice Smith"),
+        ],
+    )
+
+    stats = scrub(store, {}, dry_run=False)
+
+    assert stats["files_changed"] == 1
+    assert stats["entities_removed"] == 2
+    remaining = _load_entities(md)
+    values = [e["value"] for e in remaining]
+    assert "Du" not in values
+    assert "EUR" not in values
+    assert "Alice Smith" in values
+
+
+def test_scrub_isolated_pos_removes_common_noun(tmp_path):
+    """Single-word common nouns not in the explicit stoplist are caught by isolated POS check."""
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    # 'Woche' is NOUN in German — spaCy should tag it as NOUN in isolation.
+    # 'Alice' is PROPN — must survive.
+    md = make_md(
+        store / "notes", "doc.md",
+        body="Hello",
+        entities=[
+            _entity("person", "Woche"),
+            _entity("person", "Alice"),
+        ],
+    )
+
+    stats = scrub(store, {}, dry_run=False)
+
+    remaining = _load_entities(md)
+    values = [e["value"] for e in remaining]
+    assert "Woche" not in values
+    assert "Alice" in values
+
+
+def test_scrub_isolated_pos_keeps_multiword(tmp_path):
+    """Multi-word entities bypass the isolated POS check and are not removed."""
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    # 'Die Zeit' has 'Zeit' as a known common noun in isolation, but as a
+    # multi-word entity it bypasses the POS predicate.
+    md = make_md(
+        store / "notes", "doc.md",
+        body="Hello",
+        entities=[_entity("org", "Die Zeit")],
+    )
+
+    stats = scrub(store, {}, dry_run=False)
+
+    assert stats["entities_removed"] == 0
+    remaining = _load_entities(md)
+    assert any(e["value"] == "Die Zeit" for e in remaining)

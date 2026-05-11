@@ -28,6 +28,15 @@ _STOPLIST: frozenset[str] = frozenset({
     "re", "fwd", "wg", "aw",
 })
 
+# Common-noun and abbreviation false positives from the NER pilot (class 4 pollution).
+# Values that spaCy may tag as PROPN in some contexts but are never real entities.
+_COMMONNOUN_STOPLIST: frozenset[str] = frozenset({
+    "du", "wünschen", "zeit",
+    "eur", "chf",
+    "utc", "mesz", "cest",
+    "internet", "cv", "agb", "hrb",
+})
+
 
 def strip_markdown_artefacts(body: str) -> str:
     """Return *body* with markdown table separator and pure-pipe rows removed."""
@@ -44,3 +53,8 @@ def strip_markdown_artefacts(body: str) -> str:
 def drop_stoplist(entities: list[Entity]) -> list[Entity]:
     """Return *entities* with stoplist matches removed (type-agnostic, case-insensitive)."""
     return [e for e in entities if e.value.strip().lower() not in _STOPLIST]
+
+
+def drop_commonnoun_stoplist(entities: list[Entity]) -> list[Entity]:
+    """Remove entities matching the common-noun/abbreviation closed set (type-agnostic, case-insensitive)."""
+    return [e for e in entities if e.value.strip().lower() not in _COMMONNOUN_STOPLIST]

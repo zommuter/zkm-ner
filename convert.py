@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 _plugin_root = Path(__file__).parent
 sys.path.insert(0, str(_plugin_root / "src"))
@@ -130,7 +131,7 @@ def scrub(
     import frontmatter
 
     from zkm.atomic import write_atomic
-    from zkm_ner.textfilter import _STOPLIST
+    from zkm_ner.textfilter import _COMMONNOUN_STOPLIST, _STOPLIST
 
     md_files = [
         p for p in sorted(store_path.rglob("*.md"))
@@ -139,6 +140,44 @@ def scrub(
     total = len(md_files)
     files_changed = 0
     entities_removed = 0
+
+    # Lazy-loaded spaCy model for isolated POS check; populated on first use.
+    _nlp_de: Any = None
+    _pos_cache: dict[str, str] = {}
+
+    def _isolated_pos(value: str) -> str:
+        """Return spaCy POS of first token when *value* is analysed in isolation.
+
+        Returns "" on any failure (spaCy unavailable, empty doc).
+        Single-word values only — multi-word entities bypass this check.
+        """
+        nonlocal _nlp_de
+        if " " in value:
+            return ""
+        if value in _pos_cache:
+            return _pos_cache[value]
+        try:
+            if _nlp_de is None:
+                import spacy
+                try:
+                    _nlp_de = spacy.load("de_core_news_sm")
+                except OSError:
+                    _nlp_de = spacy.load("en_core_web_sm")
+            doc = _nlp_de(value)  # type: ignore[operator]
+            pos = doc[0].pos_ if doc else ""
+        except Exception:
+            pos = ""
+        _pos_cache[value] = pos
+        return pos
+
+    def _is_scrub_candidate(e: Any) -> bool:
+        if not isinstance(e, dict):
+            return False
+        value_lower = e.get("value", "").strip().lower()
+        if value_lower in _STOPLIST or value_lower in _COMMONNOUN_STOPLIST:
+            return True
+        pos = _isolated_pos(e.get("value", "").strip())
+        return bool(pos) and pos not in {"PROPN", "X"}
 
     for i, md_path in enumerate(md_files, 1):
         if progress:
@@ -152,10 +191,7 @@ def scrub(
         if not existing:
             continue
 
-        cleaned = [
-            e for e in existing
-            if not (isinstance(e, dict) and e.get("value", "").strip().lower() in _STOPLIST)
-        ]
+        cleaned = [e for e in existing if not _is_scrub_candidate(e)]
         removed = len(existing) - len(cleaned)
         if removed == 0:
             continue

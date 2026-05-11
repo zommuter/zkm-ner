@@ -1,9 +1,9 @@
-"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist."""
+"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist."""
 
 import pytest
 
 from zkm_ner._types import Entity
-from zkm_ner.textfilter import drop_stoplist, strip_markdown_artefacts
+from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_stoplist, strip_markdown_artefacts
 
 
 # ---------------------------------------------------------------------------
@@ -59,3 +59,38 @@ def test_drop_stoplist_no_substring_false_positive():
     ]
     result = drop_stoplist(entities)
     assert len(result) == 3
+
+
+# ---------------------------------------------------------------------------
+# drop_commonnoun_stoplist (N9c-2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("word", [
+    "Du", "wünschen", "Zeit",
+    "EUR", "CHF",
+    "UTC", "MESZ", "CEST",
+    "Internet", "CV", "AGB", "HRB",
+])
+def test_drop_commonnoun_stoplist_removes_known_words(word):
+    entities = [Entity(type="person", value=word)]
+    assert drop_commonnoun_stoplist(entities) == []
+
+
+def test_drop_commonnoun_stoplist_case_insensitive():
+    entities = [Entity(type="misc", value="eur"), Entity(type="misc", value="UTC")]
+    assert drop_commonnoun_stoplist(entities) == []
+
+
+def test_drop_commonnoun_stoplist_no_substring_false_positive():
+    """'Zeitgeist' contains 'zeit' but must not be dropped."""
+    entities = [Entity(type="misc", value="Zeitgeist")]
+    assert drop_commonnoun_stoplist(entities) == [entities[0]]
+
+
+def test_drop_commonnoun_stoplist_keeps_proper_nouns():
+    entities = [
+        Entity(type="person", value="Alice"),
+        Entity(type="org", value="Alphabet Inc"),
+    ]
+    result = drop_commonnoun_stoplist(entities)
+    assert len(result) == 2

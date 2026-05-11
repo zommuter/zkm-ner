@@ -11,7 +11,7 @@ from __future__ import annotations
 from zkm_ner._types import Entity  # re-export
 from zkm_ner.patterns import extract_all as _extract_patterns
 from zkm_ner.spacy_backend import extract_spacy
-from zkm_ner.textfilter import drop_stoplist, strip_markdown_artefacts
+from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_stoplist, strip_markdown_artefacts
 
 __all__ = ["Entity", "extract"]
 
@@ -40,14 +40,25 @@ def extract(
     pattern_spans = [(e.start, e.end) for e in pattern_ents if e.start >= 0]
     merged = list(pattern_ents)
     for ner_ent in ner_ents:
+        if not _pos_filter(ner_ent):
+            continue
         if ner_ent.start >= 0 and _overlaps_any(ner_ent.start, ner_ent.end, pattern_spans):
             continue
         merged.append(ner_ent)
 
-    return _dedup(drop_stoplist(merged))
+    return _dedup(drop_commonnoun_stoplist(drop_stoplist(merged)))
 
 
 # ---------------------------------------------------------------------------
+
+def _pos_filter(entity: Entity) -> bool:
+    """Return True if entity should pass the POS gate.
+
+    spaCy NER entities are kept only when the root token is PROPN.
+    Pattern-overlay entities have root_pos="" (no NLP context) and always pass.
+    """
+    return entity.root_pos in ("PROPN", "")
+
 
 def _overlaps_any(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
     return any(not (end <= s or start >= e) for s, e in spans)

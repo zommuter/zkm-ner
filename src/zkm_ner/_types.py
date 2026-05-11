@@ -21,6 +21,8 @@ class Entity:
     # Character offsets in the source body.  -1 means unknown / not applicable.
     start: int = field(default=-1, compare=False, repr=False)
     end: int = field(default=-1, compare=False, repr=False)
+    # Root token POS tag from spaCy.  "" for pattern-overlay entities (no NLP context).
+    root_pos: str = field(default="", compare=False, repr=False)
 
     def __post_init__(self) -> None:
         # spaCy ent.text can include surrounding newlines when an entity spans
