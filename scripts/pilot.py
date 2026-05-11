@@ -141,6 +141,19 @@ def main(argv: list[str] | None = None) -> None:
         print()
 
     # -----------------------------------------------------------------------
+    # Multi-word person values (salutation / FP candidates)
+    # -----------------------------------------------------------------------
+    mw_persons = [
+        (v, c) for v, c in value_counter["person"].most_common()
+        if len(v.split()) >= 2
+    ][:30]
+    if mw_persons:
+        print(f"=== Top-30 multi-word person values (salutation / FP candidates) ===\n")
+        for value, cnt in mw_persons:
+            print(f"    {cnt:>6,}x  {value!r}")
+        print()
+
+    # -----------------------------------------------------------------------
     # Suspicious-value dump
     # -----------------------------------------------------------------------
     print(f"=== Suspicious values ({len(suspicious):,} flagged) ===\n")

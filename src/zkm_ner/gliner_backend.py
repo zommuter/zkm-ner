@@ -31,7 +31,7 @@ def extract_gliner(
     body: str,
     *,
     lang: str | None = None,  # unused — GLiNER is multilingual
-    model_name: str = "urchade/gliner-multilingual-v2.1",
+    model_name: str = "urchade/gliner_multi-v2.1",
 ) -> list[Entity]:
     """Run GLiNER NER on *body* and return entity mentions."""
     _ = lang

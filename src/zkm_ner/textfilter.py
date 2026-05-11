@@ -32,6 +32,30 @@ _STOPLIST: frozenset[str] = frozenset({
     "re", "fwd", "wg", "aw",
 })
 
+# Multi-word salutation / sign-off phrases extracted by spaCy as PERSON (class 6 pollution).
+# Closed set derived from the post-N9c pilot top-30 multi-word PERSON audit (2026-05-11).
+# Type-agnostic: matched case-insensitively on the full value string.
+_SALUTATION_BLOCKLIST: frozenset[str] = frozenset({
+    # Greeting salutations
+    "hallo tobias",
+    "hallo tobias kienzler",
+    "hello tobias",
+    "hallo herr kienzler",
+    "hallo herr",
+    "guten tag herr kienzler",
+    "guten tag herr",
+    "lieber herr",
+    # Pronoun / phrase fragments
+    "du dich",
+    "wenn sie",
+    # Common email sign-offs (also appear in other entity types)
+    "best regards",
+    "kind regards",
+    "mit freundlichen grüßen",
+    "viele grüße",
+    "mit besten grüßen",
+})
+
 # Common-noun and abbreviation false positives from the NER pilot (class 4 pollution).
 # Values that spaCy may tag as PROPN in some contexts but are never real entities.
 _COMMONNOUN_STOPLIST: frozenset[str] = frozenset({
@@ -57,6 +81,11 @@ def strip_markdown_artefacts(body: str) -> str:
 def drop_stoplist(entities: list[Entity]) -> list[Entity]:
     """Return *entities* with stoplist matches removed (type-agnostic, case-insensitive)."""
     return [e for e in entities if e.value.strip().lower() not in _STOPLIST]
+
+
+def drop_salutation_blocklist(entities: list[Entity]) -> list[Entity]:
+    """Remove entities whose value is a known multi-word salutation or sign-off (class 6 pollution)."""
+    return [e for e in entities if e.value.strip().lower() not in _SALUTATION_BLOCKLIST]
 
 
 def drop_commonnoun_stoplist(entities: list[Entity]) -> list[Entity]:

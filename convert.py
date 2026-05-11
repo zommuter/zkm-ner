@@ -131,7 +131,7 @@ def scrub(
     import frontmatter
 
     from zkm.atomic import write_atomic
-    from zkm_ner.textfilter import _COMMONNOUN_STOPLIST, _RE_STRUCTURAL_ARTEFACT, _STOPLIST
+    from zkm_ner.textfilter import _COMMONNOUN_STOPLIST, _RE_STRUCTURAL_ARTEFACT, _SALUTATION_BLOCKLIST, _STOPLIST
 
     md_files = [
         p for p in sorted(store_path.rglob("*.md"))
@@ -208,7 +208,7 @@ def scrub(
             return False
         value = e.get("value", "")
         value_lower = value.strip().lower()
-        if value_lower in _STOPLIST or value_lower in _COMMONNOUN_STOPLIST:
+        if value_lower in _STOPLIST or value_lower in _COMMONNOUN_STOPLIST or value_lower in _SALUTATION_BLOCKLIST:
             return True
         if _RE_STRUCTURAL_ARTEFACT.match(value):
             return True
