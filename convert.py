@@ -141,32 +141,65 @@ def scrub(
     files_changed = 0
     entities_removed = 0
 
-    # Lazy-loaded spaCy model for isolated POS check; populated on first use.
+    # Lazy-loaded spaCy models for isolated POS check; None = not tried, False = unavailable.
     _nlp_de: Any = None
+    _nlp_en: Any = None
     _pos_cache: dict[str, str] = {}
+    _KEEP_POS = frozenset({"PROPN", "X"})
 
     def _isolated_pos(value: str) -> str:
         """Return spaCy POS of first token when *value* is analysed in isolation.
 
-        Returns "" on any failure (spaCy unavailable, empty doc).
+        Checks DE model first; if DE says PROPN/X, retries with EN to catch
+        English common words (e.g. 'Learn' VERB, 'Link' NOUN) that the German
+        model incorrectly treats as proper nouns.  Returns "" on failure.
         Single-word values only — multi-word entities bypass this check.
         """
-        nonlocal _nlp_de
+        nonlocal _nlp_de, _nlp_en
         if " " in value:
             return ""
         if value in _pos_cache:
             return _pos_cache[value]
-        try:
-            if _nlp_de is None:
+
+        if _nlp_de is None:
+            try:
                 import spacy
-                try:
-                    _nlp_de = spacy.load("de_core_news_sm")
-                except OSError:
-                    _nlp_de = spacy.load("en_core_web_sm")
-            doc = _nlp_de(value)  # type: ignore[operator]
-            pos = doc[0].pos_ if doc else ""
-        except Exception:
-            pos = ""
+                _nlp_de = spacy.load("de_core_news_sm")
+            except Exception:
+                _nlp_de = False
+
+        pos_de = ""
+        if _nlp_de is not False:
+            try:
+                doc = _nlp_de(value)  # type: ignore[operator]
+                pos_de = doc[0].pos_ if doc else ""
+            except Exception:
+                pass
+
+        if pos_de and pos_de not in _KEEP_POS:
+            _pos_cache[value] = pos_de
+            return pos_de
+
+        if _nlp_en is None:
+            try:
+                import spacy
+                _nlp_en = spacy.load("en_core_web_sm")
+            except Exception:
+                _nlp_en = False
+
+        pos_en = ""
+        if _nlp_en is not False:
+            try:
+                doc = _nlp_en(value)  # type: ignore[operator]
+                pos_en = doc[0].pos_ if doc else ""
+            except Exception:
+                pass
+
+        if pos_en and pos_en not in _KEEP_POS:
+            _pos_cache[value] = pos_en
+            return pos_en
+
+        pos = pos_de or pos_en
         _pos_cache[value] = pos
         return pos
 

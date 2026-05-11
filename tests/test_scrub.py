@@ -193,6 +193,37 @@ def test_scrub_drops_structural_artefact_entities(tmp_path):
     assert "PayPal" in values
 
 
+def test_scrub_bilingual_pos_drops_english_common_words(tmp_path):
+    """English words tagged PROPN/X by DE model are caught via EN model fallback.
+
+    'Learn' (VERB in EN) and 'Link' (NOUN in EN) must be scrubbed even though
+    the German model would classify both as PROPN.
+    """
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    md = make_md(
+        store / "notes", "doc.md",
+        body="Hello",
+        entities=[
+            _entity("person", "Learn"),
+            _entity("misc", "Link"),
+            _entity("person", "Alice"),
+            _entity("org", "Google"),
+        ],
+    )
+
+    stats = scrub(store, {}, dry_run=False)
+
+    assert stats["entities_removed"] == 2
+    remaining = _load_entities(md)
+    values = [e["value"] for e in remaining]
+    assert "Learn" not in values
+    assert "Link" not in values
+    assert "Alice" in values
+    assert "Google" in values
+
+
 def test_scrub_isolated_pos_keeps_multiword(tmp_path):
     """Multi-word entities bypass the isolated POS check and are not removed."""
     from convert import scrub
