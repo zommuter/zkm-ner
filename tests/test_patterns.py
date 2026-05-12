@@ -198,3 +198,77 @@ def test_entity_value_strips_trailing_newlines() -> None:
 def test_entity_value_strips_leading_and_trailing_whitespace() -> None:
     e = Entity("person", "  \n Alice Smith \n ")
     assert e.value == "Alice Smith"
+
+
+# ---------------------------------------------------------------------------
+# γ schema field tests
+# ---------------------------------------------------------------------------
+
+def test_entity_scope_defaults_to_body() -> None:
+    e = Entity("person", "Alice")
+    assert e.scope == "body"
+
+
+def test_entity_scope_custom() -> None:
+    e = Entity("email_address", "alice@example.com", scope="signature")
+    assert e.scope == "signature"
+
+
+def test_entity_canonical_none_by_default() -> None:
+    e = Entity("phone_number", "+41 79 123 45 67")
+    assert e.canonical is None
+    assert e.standard is None
+    assert e.unit is None
+    assert e.valid is True
+
+
+def test_entity_canonical_set_when_differs() -> None:
+    e = Entity("phone_number", "079 123 45 67", canonical="+41791234567", standard="E.164")
+    assert e.canonical == "+41791234567"
+    assert e.standard == "E.164"
+
+
+def test_entity_canonical_equals_value_raises() -> None:
+    import pytest
+    with pytest.raises(ValueError, match="canonical must differ from value"):
+        Entity("email_address", "alice@example.com", canonical="alice@example.com")
+
+
+def test_entity_valid_false() -> None:
+    e = Entity("iban", "DE00123456780000000000", valid=False)
+    assert e.valid is False
+
+
+def test_entity_as_dict_minimal() -> None:
+    e = Entity("person", "Alice")
+    assert e.as_dict() == {"scope": "body", "type": "person", "value": "Alice"}
+
+
+def test_entity_as_dict_with_canonical_and_standard() -> None:
+    e = Entity("phone_number", "079 123 45 67", canonical="+41791234567", standard="E.164")
+    d = e.as_dict()
+    assert d["canonical"] == "+41791234567"
+    assert d["standard"] == "E.164"
+    assert "unit" not in d
+    assert "valid" not in d
+
+
+def test_entity_as_dict_with_unit() -> None:
+    e = Entity("amount", "CHF 1'000.-", canonical="1000.00", standard="ISO 4217", unit="CHF")
+    d = e.as_dict()
+    assert d["unit"] == "CHF"
+
+
+def test_entity_as_dict_valid_false_included() -> None:
+    e = Entity("iban", "DE00123456780000000000", valid=False)
+    assert e.as_dict()["valid"] is False
+
+
+def test_entity_as_dict_valid_true_omitted() -> None:
+    e = Entity("person", "Alice")
+    assert "valid" not in e.as_dict()
+
+
+def test_entity_as_dict_scope_included() -> None:
+    e = Entity("person", "Alice", scope="signature")
+    assert e.as_dict()["scope"] == "signature"
