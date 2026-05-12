@@ -14,6 +14,7 @@ import phonenumbers
 import yaml
 
 from zkm.canonical import amount as _canonical_amount
+from zkm.canonical import iban as _canonical_iban
 from zkm_ner._types import Entity
 
 # ---------------------------------------------------------------------------
@@ -199,6 +200,59 @@ def extract_gazetteer(body: str, entries: list[dict]) -> list[Entity]:
 
 
 # ---------------------------------------------------------------------------
+# IBAN — ISO 13616
+# ---------------------------------------------------------------------------
+
+# Match IBANs: 2-letter country + 2-digit check + BBAN.
+# Allows optional spaces or hyphens between groups (spaced/hyphenated/compact).
+# Negative lookbehind/lookahead prevent matching inside longer tokens.
+_IBAN_RE = re.compile(
+    r"(?<![A-Za-z0-9])"
+    r"[A-Z]{2}\d{2}(?:[ \-]?[A-Z0-9]){11,34}"
+    r"(?![A-Za-z0-9])",
+    re.ASCII,
+)
+
+_IBAN_COMPACT_MIN = 15  # Norway: 15
+_IBAN_COMPACT_MAX = 34  # Jordan: 30 + 4 header = 34
+
+
+def _mod97(compact: str) -> int:
+    """Return compact IBAN modulo 97 per ISO 13616 (valid IBANs give 1)."""
+    rearranged = compact[4:] + compact[:4]
+    numeric_str = "".join(
+        str(ord(c) - 55) if c.isalpha() else c  # A=10 … Z=35 (ord('A')=65, 65-55=10)
+        for c in rearranged
+    )
+    return int(numeric_str) % 97
+
+
+def extract_ibans(body: str) -> list[Entity]:
+    """Extract IBAN values per ISO 13616.
+
+    ``valid=False`` when the mod-97 checksum fails (shape matches, checksum does not).
+    """
+    results = []
+    for m in _IBAN_RE.finditer(body):
+        raw = m.group(0)
+        compact = re.sub(r"[ \-]", "", raw)
+        if not (_IBAN_COMPACT_MIN <= len(compact) <= _IBAN_COMPACT_MAX):
+            continue
+        canonical_str = _canonical_iban(raw)
+        valid = _mod97(compact) == 1
+        results.append(Entity(
+            "iban",
+            raw,
+            canonical=canonical_str if canonical_str != raw else None,
+            standard="ISO 13616",
+            valid=valid,
+            start=m.start(),
+            end=m.end(),
+        ))
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Monetary amounts — DE/CH/EN
 # ---------------------------------------------------------------------------
 
@@ -262,6 +316,7 @@ def extract_all(body: str, *, gazetteer_path: str | None = None) -> list[Entity]
     raw.extend(extract_github(body))
     raw.extend(extract_social_handles(body))
     raw.extend(extract_gazetteer(body, entries))
+    raw.extend(extract_ibans(body))
     raw.extend(extract_amounts(body))
     raw.extend(extract_urls(body))
     return raw
