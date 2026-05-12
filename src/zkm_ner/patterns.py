@@ -13,6 +13,7 @@ from pathlib import Path
 import phonenumbers
 import yaml
 
+from zkm.canonical import amount as _canonical_amount
 from zkm_ner._types import Entity
 
 # ---------------------------------------------------------------------------
@@ -198,6 +199,56 @@ def extract_gazetteer(body: str, entries: list[dict]) -> list[Entity]:
 
 
 # ---------------------------------------------------------------------------
+# Monetary amounts — DE/CH/EN
+# ---------------------------------------------------------------------------
+
+# Multi-char symbols first so the alternation is greedy-correct.
+_CURR_SYMS = r"SFr\.|SFr|Fr\.|Fr|€|£|\$|¥"
+_CURR_CODES = r"[A-Z]{3}"
+
+# Number body: digits + grouping separators, avoiding consuming the '.' in '.-'.
+# \.(?!-) matches a period only when NOT followed by '-', preventing greedy
+# consumption of the dot that belongs to the Swiss '.-' suffix.
+_AMOUNT_NUM = r"\d(?:['\d,]|\.(?!-))*(?:\.-)?|\d"
+
+# Two alternatives:
+#   prefix:  [sign] CURR [sign] number
+#   suffix:  [sign] number [space?] CURR
+# Negative lookbehind/lookahead prevent matching inside longer tokens.
+_AMOUNT_RE = re.compile(
+    rf"(?<![A-Za-z\d])"
+    rf"(?:"
+    rf"(?:[-+]\s*)?(?:{_CURR_SYMS}|{_CURR_CODES})\s*(?:[-+]\s*)?(?:{_AMOUNT_NUM})"
+    rf"|"
+    rf"(?:[-+]\s*)?(?:{_AMOUNT_NUM})\s*(?:{_CURR_SYMS}|{_CURR_CODES})"
+    rf")"
+    rf"(?![A-Za-z\d])",
+)
+
+
+def extract_amounts(body: str) -> list[Entity]:
+    """Extract monetary amounts; canonical form via ``zkm.canonical.amount``."""
+    results: list[Entity] = []
+    for m in _AMOUNT_RE.finditer(body):
+        raw = m.group(0).strip()
+        try:
+            decimal_str, currency_code = _canonical_amount(raw)
+        except Exception:
+            continue
+        canonical = decimal_str if decimal_str != raw else None
+        results.append(Entity(
+            "amount",
+            raw,
+            canonical=canonical,
+            standard="ISO 4217",
+            unit=currency_code or None,
+            start=m.start(),
+            end=m.end(),
+        ))
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Combined entry point
 # ---------------------------------------------------------------------------
 
@@ -211,6 +262,7 @@ def extract_all(body: str, *, gazetteer_path: str | None = None) -> list[Entity]
     raw.extend(extract_github(body))
     raw.extend(extract_social_handles(body))
     raw.extend(extract_gazetteer(body, entries))
+    raw.extend(extract_amounts(body))
     raw.extend(extract_urls(body))
     return raw
 
