@@ -117,17 +117,32 @@ def _process_file(
 
 def scrub(
     store_path: Path,
-    config: dict,  # noqa: ARG001
+    config: dict,
     *,
     dry_run: bool = True,
     verbose: bool = False,
     progress=None,
+    with_verifier: bool = False,
+    with_verifier_control_pct: float = 0.0,
+    **_ignored,
 ) -> dict[str, int]:
     """Remove stoplist entities from existing frontmatter (retroactive cleanup).
 
     Does NOT touch amendment attribution sidecars (<md>.amendments.json).
     Idempotent: second run with dry_run=False reports files_changed=0.
+
+    When *with_verifier* is True, entities flagged as suspicious that survive the
+    heuristic checks are additionally sent to an LLM verifier; those returning
+    "drop" are included in the removal set.  Verifier config is read from *config*
+    (``ZKM_NER_VERIFIER_MODEL``, ``ZKM_NER_VERIFIER_ENDPOINT``,
+    ``ZKM_NER_VERIFIER_KEY``; fall back to the main LLM config keys).
+
+    When *with_verifier_control_pct* > 0 a random sample of non-suspicious
+    entities at that percentage is also run through the verifier as a blind-spot
+    tripwire; any non-"keep" verdict is logged to stderr.
     """
+    import random
+
     import frontmatter
 
     from zkm.atomic import write_atomic
@@ -140,6 +155,9 @@ def scrub(
     total = len(md_files)
     files_changed = 0
     entities_removed = 0
+    entities_dropped_by_verifier = 0
+    control_sampled = 0
+    control_alerts = 0
 
     # Lazy-loaded spaCy models for isolated POS check; None = not tried, False = unavailable.
     _nlp_de: Any = None
@@ -203,7 +221,43 @@ def scrub(
         _pos_cache[value] = pos
         return pos
 
-    def _is_scrub_candidate(e: Any) -> bool:
+    # ------------------------------------------------------------------
+    # Verifier setup (lazy — only when with_verifier is True)
+    # ------------------------------------------------------------------
+    _verifier_run = None
+    _is_suspicious_fn = None
+    _verifier_cache = None
+
+    if with_verifier:
+        from zkm.extraction_cache import ExtractionCache
+        from zkm_ner.suspicious import is_suspicious as _is_suspicious_fn  # type: ignore[assignment]
+        from zkm_ner.verifier import verify as _verify_fn
+
+        _v_model = (
+            config.get("ZKM_NER_VERIFIER_MODEL")
+            or config.get("ZKM_LLM_MODEL", "")
+            or "aya-expanse-8b"
+        )
+        _v_endpoint = (
+            config.get("ZKM_NER_VERIFIER_ENDPOINT")
+            or config.get("ZKM_LLM_ENDPOINT", "")
+            or "http://localhost:8080"
+        )
+        _v_key = config.get("ZKM_NER_VERIFIER_KEY") or config.get("ZKM_LLM_API_KEY", "")
+        _verifier_cache = ExtractionCache(store_path, extractor_name="ner_verifier")
+
+        def _verifier_run(e: Any, context: str | None) -> str:
+            return _verify_fn(
+                e["value"], e["type"],
+                model=_v_model,
+                endpoint=_v_endpoint,
+                api_key=_v_key,
+                context=context,
+                cache=_verifier_cache,
+            )
+
+    def _is_heuristic_candidate(e: Any) -> bool:
+        """Return True if heuristic rules flag *e* for removal."""
         if not isinstance(e, dict):
             return False
         value = e.get("value", "")
@@ -229,9 +283,52 @@ def scrub(
         if not existing:
             continue
 
-        cleaned = [e for e in existing if not _is_scrub_candidate(e)]
+        body_context: str | None = post.content[:800] if with_verifier else None
+
+        cleaned: list = []
+        file_verifier_drops = 0
+        for e in existing:
+            if _is_heuristic_candidate(e):
+                continue  # heuristic removal
+            if (
+                with_verifier
+                and _verifier_run is not None
+                and _is_suspicious_fn is not None
+                and isinstance(e, dict)
+                and _is_suspicious_fn(e.get("type", ""), e.get("value", ""))
+            ):
+                verdict = _verifier_run(e, body_context)
+                if verdict == "drop":
+                    file_verifier_drops += 1
+                    continue  # verifier removal
+            cleaned.append(e)
+
         removed = len(existing) - len(cleaned)
+        entities_dropped_by_verifier += file_verifier_drops
+
         if removed == 0:
+            # Control-sample pass even when nothing was removed
+            if (
+                with_verifier
+                and with_verifier_control_pct > 0
+                and _verifier_run is not None
+                and _is_suspicious_fn is not None
+            ):
+                for e in cleaned:
+                    if not isinstance(e, dict):
+                        continue
+                    if _is_suspicious_fn(e.get("type", ""), e.get("value", "")):
+                        continue  # skip suspicious — they were already checked above
+                    if random.random() < with_verifier_control_pct / 100.0:
+                        verdict = _verifier_run(e, body_context)
+                        control_sampled += 1
+                        if verdict != "keep":
+                            control_alerts += 1
+                            print(
+                                f"zkm-ner: CONTROL-SAMPLE ALERT: "
+                                f"{e.get('type')}={e.get('value')!r} → {verdict}",
+                                file=sys.stderr,
+                            )
             continue
 
         entities_removed += removed
@@ -239,8 +336,38 @@ def scrub(
         if verbose:
             print(f"  {md_path.relative_to(store_path)}  (-{removed} entities)", file=sys.stderr)
 
+        # Control-sample on the retained entities of changed files
+        if (
+            with_verifier
+            and with_verifier_control_pct > 0
+            and _verifier_run is not None
+            and _is_suspicious_fn is not None
+        ):
+            for e in cleaned:
+                if not isinstance(e, dict):
+                    continue
+                if _is_suspicious_fn(e.get("type", ""), e.get("value", "")):
+                    continue
+                if random.random() < with_verifier_control_pct / 100.0:
+                    verdict = _verifier_run(e, body_context)
+                    control_sampled += 1
+                    if verdict != "keep":
+                        control_alerts += 1
+                        print(
+                            f"zkm-ner: CONTROL-SAMPLE ALERT: "
+                            f"{e.get('type')}={e.get('value')!r} → {verdict}",
+                            file=sys.stderr,
+                        )
+
         if not dry_run:
             post.metadata["entities"] = cleaned
             write_atomic(md_path, frontmatter.dumps(post))
 
-    return {"files_scanned": total, "files_changed": files_changed, "entities_removed": entities_removed}
+    return {
+        "files_scanned": total,
+        "files_changed": files_changed,
+        "entities_removed": entities_removed,
+        "entities_dropped_by_verifier": entities_dropped_by_verifier,
+        "control_sampled": control_sampled,
+        "control_alerts": control_alerts,
+    }

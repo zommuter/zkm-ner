@@ -12,33 +12,20 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
+# Add the plugin src/ to sys.path so zkm_ner is importable when running as a script.
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# ---------------------------------------------------------------------------
-# "Low-confidence" heuristics (proxy for missing per-span confidence scores)
-# ---------------------------------------------------------------------------
+from zkm_ner.suspicious import is_suspicious as _is_suspicious_fn
+
 
 def _is_suspicious(entity_type: str, value: str) -> str | None:
     """Return a reason string if the entity looks suspicious, else None."""
-    stripped = value.strip()
-    if len(stripped) <= 2:
-        return f"very short ({len(stripped)} chars)"
-    if entity_type == "misc" and len(stripped.split()) == 1:
-        return "single-token MISC (highest noise rate)"
-    if re.fullmatch(r"[\W\d]+", stripped):
-        return "no alphabetic content"
-    if stripped.isupper() and len(stripped) > 2:
-        return "all-caps (possible acronym misclassification)"
-    # spaCy PER often misclassifies German adjectives as persons — flag single
-    # tokens starting with lowercase after sentence-start stripping.
-    if entity_type == "person" and stripped[0].islower():
-        return "person value starts lowercase"
-    return None
+    return _is_suspicious_fn(entity_type, value)
 
 
 # ---------------------------------------------------------------------------
