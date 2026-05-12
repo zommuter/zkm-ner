@@ -49,13 +49,25 @@ def extract_emails(body: str) -> list[Entity]:
 # ---------------------------------------------------------------------------
 
 def extract_phones(body: str, *, region: str = "CH") -> list[Entity]:
-    """Extract phone numbers using libphonenumber, default region CH."""
+    """Extract phone numbers using libphonenumber, default region CH.
+
+    value = raw matched text; canonical = compact E.164 form when it differs.
+    """
     results = []
     for match in phonenumbers.PhoneNumberMatcher(body, region):
-        normalised = phonenumbers.format_number(
+        raw = match.raw_string
+        e164 = phonenumbers.format_number(
             match.number, phonenumbers.PhoneNumberFormat.E164
         )
-        results.append(Entity("phone_number", normalised, start=match.start, end=match.end))
+        canonical = e164 if e164 != raw else None
+        results.append(Entity(
+            "phone_number",
+            raw,
+            canonical=canonical,
+            standard="E.164",
+            start=match.start,
+            end=match.end,
+        ))
     return results
 
 
@@ -115,7 +127,7 @@ def extract_urls(body: str) -> list[Entity]:
         start, end = m.start(), m.start() + len(url)
         if _overlaps_any(start, end, identity_spans):
             continue
-        results.append(Entity("url", url, start=start, end=end))
+        results.append(Entity("url", url, standard="rfc3986", start=start, end=end))
         domain = _extract_domain(url)
         if domain:
             results.append(Entity("org_hint", domain, start=start, end=end))
@@ -313,6 +325,108 @@ def extract_amounts(body: str) -> list[Entity]:
 
 
 # ---------------------------------------------------------------------------
+# Invoice IDs — keyword-anchored
+# ---------------------------------------------------------------------------
+
+_INVOICE_KEYWORD_RE = re.compile(
+    r"(?:Rechnungs(?:nummer|nr\.?)|Re\.?[-\s]Nr\.?|Invoice\s*(?:No\.?|#|Number)|"
+    r"Belegnummer|Beleg-?Nr\.?|Billing\s*(?:Ref(?:\.?|erence)?|No\.?))"
+    r"(?:\s*[:\-=])?\s+"
+    r"([A-Z0-9][A-Z0-9\-_./]{2,24})",
+    re.IGNORECASE,
+)
+
+
+def extract_invoice_ids(body: str) -> list[Entity]:
+    """Extract invoice identifiers anchored to keyword context."""
+    results = []
+    for m in _INVOICE_KEYWORD_RE.finditer(body):
+        results.append(Entity("invoice_id", m.group(1), start=m.start(1), end=m.end(1)))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Tracking IDs — carrier-specific patterns
+# ---------------------------------------------------------------------------
+
+# UPS: "1Z" followed by 16 uppercase alphanumeric chars.
+_TRACKING_UPS_RE = re.compile(r"(?<![A-Z0-9])1Z[A-Z0-9]{16}(?![A-Z0-9])")
+
+# DHL Express international: "JD" followed by 18 digits.
+_TRACKING_DHL_INTL_RE = re.compile(r"(?<![A-Z0-9])JD\d{18}(?!\d)")
+
+# Swiss Post / Post CH: 18-digit codes starting with "99".
+_TRACKING_SWISS_POST_RE = re.compile(r"(?<![0-9])99\d{16}(?!\d)")
+
+
+def extract_tracking_ids(body: str) -> list[Entity]:
+    """Extract parcel tracking codes for UPS, DHL Express, and Swiss Post."""
+    results = []
+    for m in _TRACKING_UPS_RE.finditer(body):
+        results.append(Entity("tracking_id", m.group(0), start=m.start(), end=m.end()))
+    for m in _TRACKING_DHL_INTL_RE.finditer(body):
+        results.append(Entity("tracking_id", m.group(0), start=m.start(), end=m.end()))
+    for m in _TRACKING_SWISS_POST_RE.finditer(body):
+        results.append(Entity("tracking_id", m.group(0), start=m.start(), end=m.end()))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Registration codes — HRB/HRA, ISBN-13, DIN, EAN-13
+# ---------------------------------------------------------------------------
+
+# German commercial register: "HRB 12345" or "HRA 12345 München"
+_HRB_RE = re.compile(
+    r"\bHR[AB]\s+\d{1,8}(?:\s+[A-ZÄÖÜ][a-zäöüß]{2,20})?\b"
+)
+
+# ISBN-13: "ISBN" keyword followed by 978/979 + 10 more digits (separators allowed).
+_ISBN_RE = re.compile(
+    r"(?i)\bISBN[-:\s]*(?:13[-:\s]*)?"
+    r"(97[89](?:[-\s]?\d){10})\b"
+)
+
+# DIN standard numbers: "DIN EN ISO 9001", "DIN 1045"
+_DIN_RE = re.compile(r"\bDIN(?:\s+EN)?(?:\s+ISO)?\s+\d{2,6}(?:[-:\s]\d+)?\b")
+
+# EAN-13 (keyword-anchored to avoid matching arbitrary 13-digit strings)
+_EAN_KEYWORD_RE = re.compile(
+    r"(?i)\b(?:EAN[-\s]?1?3?|GTIN[-\s]?1?3?)\s*[:\-]?\s*(\d{8,13})\b"
+)
+
+
+def extract_registration_codes(body: str) -> list[Entity]:
+    """Extract business and product registration codes."""
+    results = []
+    for m in _HRB_RE.finditer(body):
+        results.append(Entity("registration_code", m.group(0), start=m.start(), end=m.end()))
+    for m in _ISBN_RE.finditer(body):
+        raw = m.group(0)
+        digits = re.sub(r"[^0-9]", "", m.group(1))
+        canonical = digits if len(digits) == 13 and digits != raw else None
+        results.append(Entity(
+            "registration_code",
+            raw,
+            canonical=canonical,
+            standard="ISBN-13",
+            start=m.start(),
+            end=m.end(),
+        ))
+    for m in _DIN_RE.finditer(body):
+        results.append(Entity("registration_code", m.group(0), start=m.start(), end=m.end()))
+    for m in _EAN_KEYWORD_RE.finditer(body):
+        digits = m.group(1)
+        results.append(Entity(
+            "registration_code",
+            digits,
+            standard="EAN-13" if len(digits) == 13 else None,
+            start=m.start(1),
+            end=m.end(1),
+        ))
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Combined entry point
 # ---------------------------------------------------------------------------
 
@@ -329,6 +443,9 @@ def extract_all(body: str, *, gazetteer_path: str | None = None) -> list[Entity]
     raw.extend(extract_ibans(body))
     raw.extend(extract_amounts(body))
     raw.extend(extract_urls(body))
+    raw.extend(extract_invoice_ids(body))
+    raw.extend(extract_tracking_ids(body))
+    raw.extend(extract_registration_codes(body))
     return raw
 
 

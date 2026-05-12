@@ -6,9 +6,12 @@ from zkm_ner._types import Entity
 from zkm_ner.patterns import (
     extract_emails,
     extract_github,
+    extract_invoice_ids,
     extract_linkedin,
     extract_phones,
+    extract_registration_codes,
     extract_social_handles,
+    extract_tracking_ids,
     extract_urls,
     extract_gazetteer,
     load_gazetteer,
@@ -61,12 +64,23 @@ def test_phone_swiss_local() -> None:
     ents = extract_phones("Ruf uns an: 044 123 45 67", region="CH")
     assert len(ents) == 1
     assert ents[0].type == "phone_number"
-    assert ents[0].value.startswith("+41")
+    assert ents[0].value == "044 123 45 67"       # raw preserved
+    assert ents[0].canonical is not None
+    assert ents[0].canonical.startswith("+41")     # E.164
+    assert ents[0].standard == "E.164"
 
 
 def test_phone_e164_format() -> None:
     ents = extract_phones("+49 30 12345678")
+    assert ents[0].value == "+49 30 12345678"      # raw preserved
+    assert ents[0].canonical == "+493012345678"    # compact E.164
+    assert ents[0].standard == "E.164"
+
+
+def test_phone_already_compact_e164_no_canonical() -> None:
+    ents = extract_phones("+493012345678")
     assert ents[0].value == "+493012345678"
+    assert ents[0].canonical is None
 
 
 def test_phone_has_span() -> None:
@@ -85,6 +99,7 @@ def test_url_basic() -> None:
     url_ents = [e for e in ents if e.type == "url"]
     assert len(url_ents) == 1
     assert url_ents[0].value == "https://example.com"
+    assert url_ents[0].standard == "rfc3986"
 
 
 def test_url_emits_org_hint() -> None:
@@ -282,3 +297,126 @@ def test_entity_as_dict_valid_true_omitted() -> None:
 def test_entity_as_dict_scope_included() -> None:
     e = Entity("person", "Alice", scope="signature")
     assert e.as_dict()["scope"] == "signature"
+
+
+# ---------------------------------------------------------------------------
+# Invoice IDs
+# ---------------------------------------------------------------------------
+
+def test_invoice_id_keyword_rechnungsnummer() -> None:
+    ents = extract_invoice_ids("Rechnungsnummer: RE-2024-001234")
+    assert len(ents) == 1
+    assert ents[0].type == "invoice_id"
+    assert ents[0].value == "RE-2024-001234"
+
+
+def test_invoice_id_keyword_invoice_no() -> None:
+    ents = extract_invoice_ids("Invoice No. INV-2024-001")
+    assert len(ents) == 1
+    assert ents[0].value == "INV-2024-001"
+
+
+def test_invoice_id_no_keyword_no_match() -> None:
+    ents = extract_invoice_ids("Order AB-2024-001 has been shipped.")
+    assert len(ents) == 0
+
+
+def test_invoice_id_has_span() -> None:
+    body = "Rechnungsnr. 20240001"
+    ents = extract_invoice_ids(body)
+    assert len(ents) == 1
+    assert ents[0].start == body.index("20240001")
+
+
+def test_invoice_id_belegnummer() -> None:
+    ents = extract_invoice_ids("Belegnummer: 2024-RG-0099")
+    assert len(ents) == 1
+    assert ents[0].value == "2024-RG-0099"
+
+
+# ---------------------------------------------------------------------------
+# Tracking IDs
+# ---------------------------------------------------------------------------
+
+def test_tracking_id_ups() -> None:
+    ents = extract_tracking_ids("Your tracking number: 1Z999AA10123456784")
+    assert len(ents) == 1
+    assert ents[0].type == "tracking_id"
+    assert ents[0].value == "1Z999AA10123456784"
+
+
+def test_tracking_id_dhl_intl() -> None:
+    ents = extract_tracking_ids("DHL tracking: JD014600006635122948")
+    assert len(ents) == 1
+    assert ents[0].value == "JD014600006635122948"
+
+
+def test_tracking_id_swiss_post() -> None:
+    ents = extract_tracking_ids("Sendungsnummer: 990002003001009052")
+    assert len(ents) == 1
+    assert ents[0].value == "990002003001009052"
+
+
+def test_tracking_id_no_false_positive_short_number() -> None:
+    ents = extract_tracking_ids("Bitte rufen Sie 044 123 45 67 an.")
+    assert len(ents) == 0
+
+
+def test_tracking_id_has_span() -> None:
+    body = "Track: 1Z999AA10123456784 online."
+    ents = extract_tracking_ids(body)
+    assert ents[0].start == body.index("1Z999AA10123456784")
+
+
+# ---------------------------------------------------------------------------
+# Registration codes
+# ---------------------------------------------------------------------------
+
+def test_registration_code_hrb() -> None:
+    ents = extract_registration_codes("Amtsgericht München, HRB 12345")
+    assert len(ents) == 1
+    assert ents[0].type == "registration_code"
+    assert ents[0].value == "HRB 12345"
+
+
+def test_registration_code_hrb_with_city() -> None:
+    ents = extract_registration_codes("Registriert: HRB 98765 Frankfurt")
+    assert len(ents) == 1
+    assert "HRB" in ents[0].value and "98765" in ents[0].value
+
+
+def test_registration_code_hra() -> None:
+    ents = extract_registration_codes("HRA 555 Berlin")
+    assert len(ents) == 1
+    assert ents[0].value.startswith("HRA")
+
+
+def test_registration_code_isbn() -> None:
+    ents = extract_registration_codes("ISBN 978-3-16-148410-0")
+    assert len(ents) == 1
+    assert ents[0].standard == "ISBN-13"
+    assert ents[0].canonical == "9783161484100"
+
+
+def test_registration_code_isbn_compact() -> None:
+    ents = extract_registration_codes("ISBN 9783161484100")
+    assert len(ents) == 1
+    assert ents[0].standard == "ISBN-13"
+
+
+def test_registration_code_din() -> None:
+    ents = extract_registration_codes("Zertifiziert nach DIN EN ISO 9001")
+    assert len(ents) == 1
+    assert ents[0].value.startswith("DIN")
+
+
+def test_registration_code_ean13_keyword() -> None:
+    ents = extract_registration_codes("EAN-13: 4006381333931")
+    assert len(ents) == 1
+    assert ents[0].value == "4006381333931"
+    assert ents[0].standard == "EAN-13"
+
+
+def test_registration_code_ean_no_keyword_no_match() -> None:
+    ents = extract_registration_codes("Code 4006381333931 on the package")
+    assert len(ents) == 0
