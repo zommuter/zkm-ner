@@ -15,6 +15,7 @@ The prompt hash is baked into model_version so any prompt edit auto-invalidates.
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 from typing import TYPE_CHECKING, Literal
 
@@ -98,11 +99,15 @@ def _call_llm(
         return None
 
 
+_CONTROL_TOKEN_RE = re.compile(r"<\|[^|>]+\|>")
+
+
 def _parse_verdict(raw: str | None) -> Literal["drop", "keep", "unclear"]:
     """Map raw LLM response to a verdict.  Defaults to 'unclear' on any error."""
     if raw is None:
         return "unclear"
-    first_word = raw.strip().split()[0].upper().rstrip(".,!?") if raw.strip() else ""
+    cleaned = _CONTROL_TOKEN_RE.sub("", raw).strip()
+    first_word = cleaned.split()[0].upper().rstrip(".,!?") if cleaned else ""
     if first_word == "YES":
         return "keep"
     if first_word == "NO":

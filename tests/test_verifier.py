@@ -63,6 +63,13 @@ def test_parse_verdict_malformed_returns_unclear():
     assert _parse_verdict(None) == "unclear"
 
 
+def test_parse_verdict_strips_aya_control_token():
+    """aya-expanse appends <|END_OF_TURN_TOKEN|>; parser must strip it."""
+    assert _parse_verdict("YES<|END_OF_TURN_TOKEN|>") == "keep"
+    assert _parse_verdict("NO<|END_OF_TURN_TOKEN|>") == "drop"
+    assert _parse_verdict("UNCLEAR<|END_OF_TURN_TOKEN|>") == "unclear"
+
+
 # ---------------------------------------------------------------------------
 # verify() integration tests
 # ---------------------------------------------------------------------------
