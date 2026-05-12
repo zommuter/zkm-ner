@@ -24,11 +24,21 @@ def test_email_basic() -> None:
     assert len(ents) == 1
     assert ents[0].type == "email_address"
     assert ents[0].value == "hello@example.com"
+    assert ents[0].standard == "rfc5321"
+    assert ents[0].canonical is None  # already domain-lowercase, no canonical needed
 
 
-def test_email_lowercased() -> None:
+def test_email_uppercase_domain_sets_canonical() -> None:
     ents = extract_emails("Reach me at Alice.Smith@Company.COM")
-    assert ents[0].value == "alice.smith@company.com"
+    assert ents[0].value == "Alice.Smith@Company.COM"  # raw preserved
+    assert ents[0].canonical == "Alice.Smith@company.com"  # domain lowercased (RFC 5321)
+    assert ents[0].standard == "rfc5321"
+
+
+def test_email_already_normalized_no_canonical() -> None:
+    ents = extract_emails("user@example.org")
+    assert ents[0].value == "user@example.org"
+    assert ents[0].canonical is None
 
 
 def test_email_has_span() -> None:

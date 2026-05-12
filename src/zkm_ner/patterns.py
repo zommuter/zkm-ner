@@ -14,6 +14,7 @@ import phonenumbers
 import yaml
 
 from zkm.canonical import amount as _canonical_amount
+from zkm.canonical import email as _canonical_email
 from zkm.canonical import iban as _canonical_iban
 from zkm_ner._types import Entity
 
@@ -28,10 +29,19 @@ _EMAIL_RE = re.compile(
 
 
 def extract_emails(body: str) -> list[Entity]:
-    return [
-        Entity("email_address", m.group(0).lower(), start=m.start(), end=m.end())
-        for m in _EMAIL_RE.finditer(body)
-    ]
+    results = []
+    for m in _EMAIL_RE.finditer(body):
+        raw = m.group(0)
+        canon = _canonical_email(raw)
+        results.append(Entity(
+            "email_address",
+            raw,
+            canonical=canon if canon != raw else None,
+            standard="rfc5321",
+            start=m.start(),
+            end=m.end(),
+        ))
+    return results
 
 
 # ---------------------------------------------------------------------------

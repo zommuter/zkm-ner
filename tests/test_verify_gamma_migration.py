@@ -209,3 +209,30 @@ def test_verify_no_entities_file_skipped(tmp_path):
                        out_path=tmp_path / "diff.jsonl")
 
     assert stats["n"] == 0
+
+
+def test_verify_email_case_change_is_pipeline_drift(tmp_path):
+    """email-v1 upgrades to raw value + canonical; old fully-lowercased value is
+    pipeline drift (informational only, not a gate failure).
+
+    Old store: entity value was produced by m.group(0).lower() → "alice@example.com"
+    New extraction: value = raw "Alice@Example.COM", canonical = "Alice@example.com"
+    The stored key ("body","email_address","alice@example.com") != fresh key
+    ("body","email_address","Alice@Example.COM") → counted as drift, not collision.
+    """
+    store = make_store(tmp_path)
+    make_md(
+        store / "notes", "doc.md",
+        body="Contact Alice@Example.COM for details.",
+        entities=[{"scope": "body", "type": "email_address", "value": "alice@example.com"}],
+    )
+    fresh = [_fresh("email_address", "Alice@Example.COM")]
+    with patch.object(_vgm, "_extract_fresh", return_value=fresh):
+        stats = verify(store, sample_size=10, seed=0, full_corpus=True,
+                       out_path=tmp_path / "diff.jsonl")
+
+    assert stats["collision_files"] == 0
+    assert stats["schema_error_files"] == 0
+    assert stats["agreement"] == 0  # old lowercase != new raw value → drift
+    assert stats["only_in_stored"] == 1
+    assert stats["only_in_fresh"] == 1
