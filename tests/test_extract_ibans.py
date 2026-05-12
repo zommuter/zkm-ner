@@ -14,8 +14,12 @@ _DE_IBAN_COMPACT = "DE89370400440532013000"
 _DE_IBAN_SPACED = "DE89 3704 0044 0532 0130 00"
 _DE_IBAN_HYPHEN = "DE89-3704-0044-0532-0130-00"
 
-# UK test IBAN (ISO 13616 / Wikipedia example)
+# UK test IBAN (ISO 13616 / Wikipedia example, 22 chars)
 _GB_IBAN_COMPACT = "GB82WEST12345698765432"
+
+# Swiss IBAN (ISO 13616 example, 21 chars — shorter than DE/GB)
+_CH_IBAN_COMPACT = "CH5604835012345678009"
+_CH_IBAN_SPACED  = "CH56 0483 5012 3456 7800 9"
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +76,25 @@ def test_uk_iban_compact() -> None:
     assert len(ents) == 1
     e = ents[0]
     assert e.value == _GB_IBAN_COMPACT
+    assert e.valid is True
+
+
+def test_swiss_iban_compact_21_chars() -> None:
+    """Swiss IBANs are 21 chars (shorter than German 22); must not be rejected."""
+    ents = extract_ibans(f"Konto: {_CH_IBAN_COMPACT}")
+    assert len(ents) == 1
+    e = ents[0]
+    assert e.value == _CH_IBAN_COMPACT
+    assert e.canonical is None  # already compact
+    assert e.valid is True
+
+
+def test_swiss_iban_spaced_canonical() -> None:
+    ents = extract_ibans(f"Konto: {_CH_IBAN_SPACED}.")
+    assert len(ents) == 1
+    e = ents[0]
+    assert e.value == _CH_IBAN_SPACED
+    assert e.canonical == _CH_IBAN_COMPACT
     assert e.valid is True
 
 
