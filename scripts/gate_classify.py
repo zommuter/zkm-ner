@@ -20,8 +20,7 @@
     3  real-but-noisy a real org/name buried in legal footer or boilerplate
 
   Verifier was CORRECT — this is junk that should be removed:
-    4  rule-could-do  obvious junk a simple heuristic/stoplist could catch
-    5  llm-needed     subtle junk that only the LLM can reliably spot
+    4  correct-drop   it's junk, the verifier was right to drop it
 
   Navigation:
     s  split   classify this batch item by item
@@ -52,20 +51,19 @@ KEY_MAP = {
     "1": "real-entity",
     "2": "my-own-info",
     "3": "real-but-noisy",
-    "4": "rule-could-do",
-    "5": "llm-needed",
+    "4": "correct-drop",
     "s": "split",
     "k": "skip",
     "q": "quit",
 }
 
 LEGIT   = {"real-entity", "my-own-info", "real-but-noisy"}
-CORRECT = {"rule-could-do", "llm-needed"}
+CORRECT = {"correct-drop"}
 BUCKETS = LEGIT | CORRECT
 
 KEY_HINT = (
     " WRONG drop → [1] real-entity  [2] my-own-info  [3] real-but-noisy\n"
-    " RIGHT drop → [4] rule-could-do  [5] llm-needed\n"
+    " RIGHT drop → [4] correct-drop  (junk, verifier was right)\n"
     "              [s] split  [k] skip  [q] quit"
 )
 
