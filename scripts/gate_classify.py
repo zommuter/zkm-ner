@@ -12,16 +12,21 @@
     # Step 3: compute Gate A/B/C from the completed file
     uv run python scripts/gate_classify.py --gate
 
-## Keys
+## Keys  (question: "was the verifier RIGHT to drop this?")
 
-    1  legit          real entity wrongly dropped         (FP drop — bad)
-    2  own-name       your own name/contact info           (FP drop — bad)
-    3  boilerplate    real org but footer/legal noise      (FP drop — bad)
-    4  closed-set-fp  known FP class heuristic could catch (correct drop)
-    5  open-set-fp    genuine FP, no heuristic catches it  (correct drop)
-    s  split          classify this batch one by one
-    k  skip           defer to end
-    q  quit           save and exit (resumes next time)
+  Verifier was WRONG — this is a real entity it shouldn't have dropped:
+    1  real-entity    a genuine person/org/place the verifier killed
+    2  my-own-info    your own name, email, phone number
+    3  real-but-noisy a real org/name buried in legal footer or boilerplate
+
+  Verifier was CORRECT — this is junk that should be removed:
+    4  rule-could-do  obvious junk a simple heuristic/stoplist could catch
+    5  llm-needed     subtle junk that only the LLM can reliably spot
+
+  Navigation:
+    s  split   classify this batch item by item
+    k  skip    defer to end
+    q  quit    save and exit (resumes next time)
 
 ## Gate thresholds (docs/meeting-notes/2026-05-11-2316-n9d-llm-verifier-design.md)
 
@@ -44,23 +49,24 @@ from pathlib import Path
 # ── Key→bucket mapping ────────────────────────────────────────────────────────
 
 KEY_MAP = {
-    "1": "legit",
-    "2": "own-name",
-    "3": "boilerplate",
-    "4": "closed-set-fp",
-    "5": "open-set-fp",
+    "1": "real-entity",
+    "2": "my-own-info",
+    "3": "real-but-noisy",
+    "4": "rule-could-do",
+    "5": "llm-needed",
     "s": "split",
     "k": "skip",
     "q": "quit",
 }
 
-LEGIT   = {"legit", "own-name", "boilerplate"}
-CORRECT = {"closed-set-fp", "open-set-fp"}
+LEGIT   = {"real-entity", "my-own-info", "real-but-noisy"}
+CORRECT = {"rule-could-do", "llm-needed"}
 BUCKETS = LEGIT | CORRECT
 
 KEY_HINT = (
-    " [1] legit  [2] own-name  [3] boilerplate  [4] closed-set-fp  [5] open-set-fp"
-    "  [s] split  [k] skip  [q] quit"
+    " WRONG drop → [1] real-entity  [2] my-own-info  [3] real-but-noisy\n"
+    " RIGHT drop → [4] rule-could-do  [5] llm-needed\n"
+    "              [s] split  [k] skip  [q] quit"
 )
 
 # ── Single-keypress input ─────────────────────────────────────────────────────
@@ -380,6 +386,17 @@ def cmd_gate(args: argparse.Namespace) -> None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+def cmd_reset(args: argparse.Namespace) -> None:
+    path = _resolve_tsv(args)
+    if not path:
+        sys.exit("No sample TSV found.")
+    rows = _load_tsv(path)
+    for r in rows:
+        r["bucket"] = ""
+    _save_tsv(path, rows)
+    print(f"Reset {len(rows)} classifications in {path.name}")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--store", default=None)
@@ -390,12 +407,15 @@ def main() -> None:
     mode.add_argument("--sample",   action="store_true", help="Generate 100-item sample TSV")
     mode.add_argument("--classify", action="store_true", help="Interactive classifier (default)")
     mode.add_argument("--gate",     action="store_true", help="Print Gate A/B/C result")
+    mode.add_argument("--reset",    action="store_true", help="Clear all bucket classifications")
     args = p.parse_args()
 
     if args.sample:
         cmd_sample(args)
     elif args.gate:
         cmd_gate(args)
+    elif args.reset:
+        cmd_reset(args)
     else:
         cmd_classify(args)
 
