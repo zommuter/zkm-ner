@@ -41,14 +41,14 @@ _STOPLIST: frozenset[str] = frozenset({
 # Type-agnostic: matched case-insensitively on the full value string.
 _SALUTATION_BLOCKLIST: frozenset[str] = frozenset({
     # Greeting salutations
-    "hallo tobias",
-    "hallo tobias kienzler",
-    "hello tobias",
-    "lieber tobias",
+    "hallo maxine",
+    "hallo maxine mustermann",
+    "hello maxine",
+    "lieber maxine",
     "hallo alexander",
-    "hallo herr kienzler",
+    "hallo herr mustermann",
     "hallo herr",
-    "guten tag herr kienzler",
+    "guten tag herr mustermann",
     "guten tag herr",
     "guten morgen herr",
     "lieber herr",

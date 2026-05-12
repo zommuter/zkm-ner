@@ -55,7 +55,7 @@ def test_drop_stoplist_no_substring_false_positive():
     entities = [
         Entity(type="person", value="Reginald"),
         Entity(type="org", value="Forward GmbH"),
-        Entity(type="person", value="Tobias"),
+        Entity(type="person", value="Maxine"),
     ]
     result = drop_stoplist(entities)
     assert len(result) == 3
@@ -126,14 +126,14 @@ def test_drop_structural_artefacts_empty_list():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("value", [
-    "Hallo Tobias",
-    "hallo tobias",
-    "HALLO TOBIAS",
-    "Hallo Tobias Kienzler",
-    "Hello Tobias",
-    "Hallo Herr Kienzler",
+    "Hallo Maxine",
+    "hallo maxine",
+    "HALLO MAXINE",
+    "Hallo Maxine Mustermann",
+    "Hello Maxine",
+    "Hallo Herr Mustermann",
     "Hallo Herr",
-    "Guten Tag Herr Kienzler",
+    "Guten Tag Herr Mustermann",
     "Guten Tag Herr",
     "Lieber Herr",
     "Du Dich",
@@ -153,7 +153,7 @@ def test_drop_salutation_blocklist_removes_known_phrases(value):
 def test_drop_salutation_blocklist_type_agnostic():
     """Blocklist is type-agnostic — should drop PERSON, ORG, MISC variants."""
     entities = [
-        Entity(type="person", value="Hallo Tobias"),
+        Entity(type="person", value="Hallo Maxine"),
         Entity(type="org", value="Best Regards"),
         Entity(type="misc", value="Du Dich"),
     ]
@@ -163,7 +163,7 @@ def test_drop_salutation_blocklist_type_agnostic():
 def test_drop_salutation_blocklist_keeps_real_names():
     """Real person names and orgs must survive."""
     real = [
-        Entity(type="person", value="Tobias Kienzler"),
+        Entity(type="person", value="Maxine Mustermann"),
         Entity(type="person", value="John F. Kennedy"),
         Entity(type="org", value="Humble Bundle"),
         Entity(type="org", value="Google"),
