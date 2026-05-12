@@ -224,6 +224,51 @@ def test_scrub_bilingual_pos_drops_english_common_words(tmp_path):
     assert "Google" in values
 
 
+def test_scrub_pilot_dump_writes_jsonl_for_verifier_verdicts(tmp_path):
+    """When pilot_dump_path is set and a verifier is active, verdicts are written to JSONL."""
+    import json
+    from unittest.mock import patch
+
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    make_md(
+        store / "notes", "doc.md",
+        body="Some context",
+        entities=[
+            _entity("person", "klicken Sie"),  # suspicious: lowercase person
+            _entity("org", "Swiss Federal Railways"),  # legit org, not suspicious
+        ],
+    )
+
+    dump_path = tmp_path / "pilot.jsonl"
+
+    def _fake_verify(value, type_, *, model, endpoint, api_key, context, cache):
+        return "drop" if value == "klicken Sie" else "keep"
+
+    with patch("zkm_ner.verifier.verify", side_effect=_fake_verify):
+        stats = scrub(
+            store, {},
+            dry_run=True,
+            with_verifier=True,
+            pilot_dump_path=dump_path,
+        )
+
+    assert dump_path.exists()
+    records = [json.loads(line) for line in dump_path.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 1  # only the suspicious entity goes to verifier
+    rec = records[0]
+    assert rec["value"] == "klicken Sie"
+    assert rec["type"] == "person"
+    assert rec["verdict"] == "drop"
+    assert rec["suspicious_reason"] is not None
+    assert rec["is_control"] is False
+    assert stats["pilot_records"] == 1
+    # dry_run: file not modified
+    remaining = _load_entities(store / "notes" / "doc.md")
+    assert len(remaining) == 2
+
+
 def test_scrub_isolated_pos_keeps_multiword(tmp_path):
     """Multi-word entities bypass the isolated POS check and are not removed."""
     from convert import scrub

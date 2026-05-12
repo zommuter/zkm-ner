@@ -124,6 +124,7 @@ def scrub(
     progress=None,
     with_verifier: bool = False,
     with_verifier_control_pct: float = 0.0,
+    pilot_dump_path: "Path | None" = None,
     **_ignored,
 ) -> dict[str, int]:
     """Remove stoplist entities from existing frontmatter (retroactive cleanup).
@@ -158,6 +159,7 @@ def scrub(
     entities_dropped_by_verifier = 0
     control_sampled = 0
     control_alerts = 0
+    _pilot_records: list[dict] = []  # filled when pilot_dump_path is set
 
     # Lazy-loaded spaCy models for isolated POS check; None = not tried, False = unavailable.
     _nlp_de: Any = None
@@ -298,6 +300,15 @@ def scrub(
                 and _is_suspicious_fn(e.get("type", ""), e.get("value", ""))
             ):
                 verdict = _verifier_run(e, body_context)
+                if pilot_dump_path is not None:
+                    _pilot_records.append({
+                        "value": e.get("value"), "type": e.get("type"),
+                        "verdict": verdict,
+                        "suspicious_reason": _is_suspicious_fn(e.get("type", ""), e.get("value", "")),
+                        "file": str(md_path.relative_to(store_path)),
+                        "context_snippet": (body_context or "")[:200],
+                        "is_control": False,
+                    })
                 if verdict == "drop":
                     file_verifier_drops += 1
                     continue  # verifier removal
@@ -322,6 +333,15 @@ def scrub(
                     if random.random() < with_verifier_control_pct / 100.0:
                         verdict = _verifier_run(e, body_context)
                         control_sampled += 1
+                        if pilot_dump_path is not None:
+                            _pilot_records.append({
+                                "value": e.get("value"), "type": e.get("type"),
+                                "verdict": verdict,
+                                "suspicious_reason": None,
+                                "file": str(md_path.relative_to(store_path)),
+                                "context_snippet": (body_context or "")[:200],
+                                "is_control": True,
+                            })
                         if verdict != "keep":
                             control_alerts += 1
                             print(
@@ -351,6 +371,15 @@ def scrub(
                 if random.random() < with_verifier_control_pct / 100.0:
                     verdict = _verifier_run(e, body_context)
                     control_sampled += 1
+                    if pilot_dump_path is not None:
+                        _pilot_records.append({
+                            "value": e.get("value"), "type": e.get("type"),
+                            "verdict": verdict,
+                            "suspicious_reason": None,
+                            "file": str(md_path.relative_to(store_path)),
+                            "context_snippet": (body_context or "")[:200],
+                            "is_control": True,
+                        })
                     if verdict != "keep":
                         control_alerts += 1
                         print(
@@ -363,6 +392,13 @@ def scrub(
             post.metadata["entities"] = cleaned
             write_atomic(md_path, frontmatter.dumps(post))
 
+    if pilot_dump_path is not None and _pilot_records:
+        import json
+        pilot_dump_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(pilot_dump_path, "w", encoding="utf-8") as fh:
+            for rec in _pilot_records:
+                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
     return {
         "files_scanned": total,
         "files_changed": files_changed,
@@ -370,4 +406,5 @@ def scrub(
         "entities_dropped_by_verifier": entities_dropped_by_verifier,
         "control_sampled": control_sampled,
         "control_alerts": control_alerts,
+        "pilot_records": len(_pilot_records),
     }
