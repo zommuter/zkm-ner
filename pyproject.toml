@@ -4,10 +4,24 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zkm-ner"
-version = "0.12.0"
+version = "0.13.0"
 description = "zkm amender plugin: NER entity extraction into md frontmatter"
 license = "MIT"
 requires-python = ">=3.14"
+authors = [{name = "Tobias Kienzler", email = "zommuter@googlemail.com"}]
+keywords = ["knowledge-management", "markdown", "personal-data", "ner", "spacy", "entity-extraction"]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Office/Business",
+    "Topic :: Text Processing",
+    "Typing :: Typed",
+]
 dependencies = [
     "de-core-news-sm",
     "en-core-web-sm",
@@ -15,8 +29,13 @@ dependencies = [
     "phonenumbers>=8.13",
     "python-frontmatter>=1.1",
     "spacy>=3.7",
-    "zkm>=0.3.0,<0.4.0",
+    "zkm>=0.4,<1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/zommuter/zkm"
+Repository = "https://github.com/zommuter/zkm-ner"
+Issues = "https://github.com/zommuter/zkm-ner/issues"
 
 [project.optional-dependencies]
 gliner = [
