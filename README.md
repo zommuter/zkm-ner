@@ -35,6 +35,36 @@ uv run python -m spacy download en_core_web_sm
 | `ZKM_NER_LANG` | *(auto)* | Force language code (`de`, `en`) — skips langdetect |
 | `ZKM_NER_GAZETTEER` | *(built-in)* | Path to a custom YAML org-alias map |
 
+## Frontmatter output
+
+Entities are written using the γ typed-slot schema:
+
+```yaml
+entities:
+  - scope: body          # body | signature | salutation
+    type: person
+    value: "Jane Smith"
+  - scope: body
+    type: amount
+    value: "CHF 42.00"
+    canonical: "42.00"
+    unit: CHF
+    standard: iso4217
+  - scope: body
+    type: iban
+    value: "CH56 0483 5012 3456 7800 9"
+    canonical: CH5604835012345678009
+    standard: iso13616
+  - scope: signature
+    type: email_address
+    value: jane@example.com
+    canonical: jane@example.com
+    standard: rfc5321
+```
+
+Supported types: `person`, `org`, `location`, `email_address`, `phone_number`, `url`,
+`iban`, `amount`, `invoice_id`, `tracking_id`, `registration_code`, `social_handle.*`.
+
 ## Run
 
 ```bash
