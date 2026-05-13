@@ -287,3 +287,136 @@ def test_scrub_isolated_pos_keeps_multiword(tmp_path):
     assert stats["entities_removed"] == 0
     remaining = _load_entities(md)
     assert any(e["value"] == "Die Zeit" for e in remaining)
+
+
+# ---------------------------------------------------------------------------
+# Resume / watermark / incremental pilot flush
+# ---------------------------------------------------------------------------
+
+
+def test_resume_after_file_skips_processed_files(tmp_path):
+    """resume_after_file causes the plugin to skip files before the watermark."""
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    # Create 3 files, two with stale entities.
+    make_md(store / "notes", "a.md", body="x", entities=[_entity("person", "Subject")])
+    make_md(store / "notes", "b.md", body="x", entities=[_entity("person", "Subject")])
+    make_md(store / "notes", "c.md", body="x", entities=[_entity("person", "Subject")])
+
+    # Resume after b.md → only c.md should be processed.
+    stats = scrub(store, {}, dry_run=False, resume_after_file="notes/b.md")
+
+    assert stats["files_scanned"] == 1  # only c.md
+    assert stats["files_changed"] == 1
+    assert stats["entities_removed"] == 1
+    # a.md and b.md should still have the stale entity (not processed).
+    assert _load_entities(store / "notes" / "a.md")[0]["value"] == "Subject"
+    assert _load_entities(store / "notes" / "b.md")[0]["value"] == "Subject"
+
+
+def test_on_file_done_called_for_every_file(tmp_path):
+    """on_file_done callback is called for every file, including those with no entities."""
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    make_md(store / "notes", "a.md", body="x", entities=[_entity("person", "Subject")])
+    make_md(store / "notes", "b.md", body="x")  # no entities
+    make_md(store / "notes", "c.md", body="x", entities=[_entity("org", "PayPal")])
+
+    seen: list[str] = []
+    scrub(store, {}, dry_run=True, on_file_done=seen.append)
+
+    assert sorted(seen) == ["notes/a.md", "notes/b.md", "notes/c.md"]
+
+
+def test_on_file_done_called_even_for_unchanged_files(tmp_path):
+    """on_file_done is called even when no entities are removed from a file."""
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    make_md(store / "notes", "clean.md", body="x", entities=[_entity("org", "PayPal")])
+
+    seen: list[str] = []
+    scrub(store, {}, dry_run=True, on_file_done=seen.append)
+
+    assert seen == ["notes/clean.md"]
+
+
+def test_pilot_dump_incremental_flush(tmp_path):
+    """Pilot records are written immediately — the file exists before the run ends."""
+    import json
+    from unittest.mock import patch
+
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    make_md(
+        store / "notes", "doc.md",
+        body="Some context",
+        entities=[_entity("person", "klicken Sie")],
+    )
+
+    dump_path = tmp_path / "pilot.jsonl"
+    written_during_run: list[bool] = []
+
+    original_flush = None
+
+    def _fake_verify(value, type_, *, model, endpoint, api_key, context, cache):
+        # Check whether the file has content at time of verify call.
+        # After _write_pilot is called (flush), the file must have content.
+        return "drop"
+
+    with patch("zkm_ner.verifier.verify", side_effect=_fake_verify):
+        scrub(
+            store, {},
+            dry_run=True,
+            with_verifier=True,
+            pilot_dump_path=dump_path,
+        )
+
+    # File must exist and have content after the run.
+    assert dump_path.exists()
+    records = [json.loads(l) for l in dump_path.read_text().splitlines() if l.strip()]
+    assert len(records) >= 1
+    assert records[0]["value"] == "klicken Sie"
+
+
+def test_pilot_dump_appends_on_resume(tmp_path):
+    """Pilot dump opened in append mode — existing records are not overwritten."""
+    import json
+    from unittest.mock import patch
+
+    from convert import scrub
+
+    store = make_store(tmp_path)
+    make_md(
+        store / "notes", "doc.md",
+        body="context",
+        entities=[_entity("person", "klicken Sie")],
+    )
+
+    dump_path = tmp_path / "pilot.jsonl"
+    # Pre-seed the pilot file with a record from a previous partial run.
+    dump_path.write_text(
+        json.dumps({"value": "prior record", "type": "person", "verdict": "drop",
+                    "suspicious_reason": "test", "file": "notes/prior.md",
+                    "context_snippet": "", "is_control": False}) + "\n",
+        encoding="utf-8",
+    )
+
+    def _fake_verify(value, type_, *, model, endpoint, api_key, context, cache):
+        return "drop"
+
+    with patch("zkm_ner.verifier.verify", side_effect=_fake_verify):
+        scrub(
+            store, {},
+            dry_run=True,
+            with_verifier=True,
+            pilot_dump_path=dump_path,
+        )
+
+    records = [json.loads(l) for l in dump_path.read_text().splitlines() if l.strip()]
+    assert len(records) == 2  # prior + new
+    assert records[0]["value"] == "prior record"
+    assert records[1]["value"] == "klicken Sie"

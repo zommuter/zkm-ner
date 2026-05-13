@@ -125,6 +125,8 @@ def scrub(
     with_verifier: bool = False,
     with_verifier_control_pct: float = 0.0,
     pilot_dump_path: "Path | None" = None,
+    resume_after_file: "str | None" = None,
+    on_file_done: "object | None" = None,
     **_ignored,
 ) -> dict[str, int]:
     """Remove stoplist entities from existing frontmatter (retroactive cleanup).
@@ -142,6 +144,7 @@ def scrub(
     entities at that percentage is also run through the verifier as a blind-spot
     tripwire; any non-"keep" verdict is logged to stderr.
     """
+    import json
     import random
 
     import frontmatter
@@ -153,13 +156,24 @@ def scrub(
         p for p in sorted(store_path.rglob("*.md"))
         if not any(part.startswith(".") for part in p.relative_to(store_path).parts[:-1])
     ]
+
+    # Skip files already processed in an interrupted run.
+    if resume_after_file is not None:
+        resume_rel = Path(resume_after_file)
+        resume_idx = next(
+            (j for j, p in enumerate(md_files) if p.relative_to(store_path) == resume_rel),
+            None,
+        )
+        if resume_idx is not None:
+            md_files = md_files[resume_idx + 1:]
+
     total = len(md_files)
     files_changed = 0
     entities_removed = 0
     entities_dropped_by_verifier = 0
     control_sampled = 0
     control_alerts = 0
-    _pilot_records: list[dict] = []  # filled when pilot_dump_path is set
+    _pilot_count = 0  # records written to pilot_dump_path
 
     # Lazy-loaded spaCy models for isolated POS check; None = not tried, False = unavailable.
     _nlp_de: Any = None
@@ -273,52 +287,112 @@ def scrub(
         pos = _isolated_pos(value.strip())
         return bool(pos) and pos not in {"PROPN", "X"}
 
-    for i, md_path in enumerate(md_files, 1):
-        if progress:
-            progress(i, total, str(md_path.relative_to(store_path)))
-        try:
-            post = frontmatter.load(str(md_path))
-        except Exception:
-            continue
+    # Open pilot dump file in append mode for incremental flushing.
+    _pilot_fh = None
+    if pilot_dump_path is not None:
+        pilot_dump_path.parent.mkdir(parents=True, exist_ok=True)
+        _pilot_fh = open(pilot_dump_path, "a", encoding="utf-8")  # noqa: SIM115
 
-        existing = post.metadata.get("entities")
-        if not existing:
-            continue
+    def _write_pilot(record: dict) -> None:
+        nonlocal _pilot_count
+        if _pilot_fh is not None:
+            _pilot_fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+            _pilot_fh.flush()
+            _pilot_count += 1
 
-        body_context: str | None = post.content[:800] if with_verifier else None
+    try:
+        for i, md_path in enumerate(md_files, 1):
+            if progress:
+                progress(i, total, str(md_path.relative_to(store_path)))
 
-        cleaned: list = []
-        file_verifier_drops = 0
-        for e in existing:
-            if _is_heuristic_candidate(e):
-                continue  # heuristic removal
-            if (
-                with_verifier
-                and _verifier_run is not None
-                and _is_suspicious_fn is not None
-                and isinstance(e, dict)
-                and _is_suspicious_fn(e.get("type", ""), e.get("value", ""))
-            ):
-                verdict = _verifier_run(e, body_context)
-                if pilot_dump_path is not None:
-                    _pilot_records.append({
+            _rel = str(md_path.relative_to(store_path))
+
+            def _mark_done() -> None:
+                if on_file_done is not None:
+                    on_file_done(_rel)  # type: ignore[operator]
+
+            try:
+                post = frontmatter.load(str(md_path))
+            except Exception:
+                _mark_done()
+                continue
+
+            existing = post.metadata.get("entities")
+            if not existing:
+                _mark_done()
+                continue
+
+            body_context: str | None = post.content[:800] if with_verifier else None
+
+            cleaned: list = []
+            file_verifier_drops = 0
+            for e in existing:
+                if _is_heuristic_candidate(e):
+                    continue  # heuristic removal
+                if (
+                    with_verifier
+                    and _verifier_run is not None
+                    and _is_suspicious_fn is not None
+                    and isinstance(e, dict)
+                    and _is_suspicious_fn(e.get("type", ""), e.get("value", ""))
+                ):
+                    verdict = _verifier_run(e, body_context)
+                    _write_pilot({
                         "value": e.get("value"), "type": e.get("type"),
                         "verdict": verdict,
                         "suspicious_reason": _is_suspicious_fn(e.get("type", ""), e.get("value", "")),
-                        "file": str(md_path.relative_to(store_path)),
+                        "file": _rel,
                         "context_snippet": (body_context or "")[:200],
                         "is_control": False,
                     })
-                if verdict == "drop":
-                    file_verifier_drops += 1
-                    continue  # verifier removal
-            cleaned.append(e)
+                    if verdict == "drop":
+                        file_verifier_drops += 1
+                        continue  # verifier removal
+                cleaned.append(e)
 
-        removed = len(existing) - len(cleaned)
-        entities_dropped_by_verifier += file_verifier_drops
+            removed = len(existing) - len(cleaned)
+            entities_dropped_by_verifier += file_verifier_drops
 
-        if removed == 0:
-            # Control-sample pass even when nothing was removed
+            if removed == 0:
+                # Control-sample pass even when nothing was removed
+                if (
+                    with_verifier
+                    and with_verifier_control_pct > 0
+                    and _verifier_run is not None
+                    and _is_suspicious_fn is not None
+                ):
+                    for e in cleaned:
+                        if not isinstance(e, dict):
+                            continue
+                        if _is_suspicious_fn(e.get("type", ""), e.get("value", "")):
+                            continue  # skip suspicious — they were already checked above
+                        if random.random() < with_verifier_control_pct / 100.0:
+                            verdict = _verifier_run(e, body_context)
+                            control_sampled += 1
+                            _write_pilot({
+                                "value": e.get("value"), "type": e.get("type"),
+                                "verdict": verdict,
+                                "suspicious_reason": None,
+                                "file": _rel,
+                                "context_snippet": (body_context or "")[:200],
+                                "is_control": True,
+                            })
+                            if verdict != "keep":
+                                control_alerts += 1
+                                print(
+                                    f"zkm-ner: CONTROL-SAMPLE ALERT: "
+                                    f"{e.get('type')}={e.get('value')!r} → {verdict}",
+                                    file=sys.stderr,
+                                )
+                _mark_done()
+                continue
+
+            entities_removed += removed
+            files_changed += 1
+            if verbose:
+                print(f"  {md_path.relative_to(store_path)}  (-{removed} entities)", file=sys.stderr)
+
+            # Control-sample on the retained entities of changed files
             if (
                 with_verifier
                 and with_verifier_control_pct > 0
@@ -329,19 +403,18 @@ def scrub(
                     if not isinstance(e, dict):
                         continue
                     if _is_suspicious_fn(e.get("type", ""), e.get("value", "")):
-                        continue  # skip suspicious — they were already checked above
+                        continue
                     if random.random() < with_verifier_control_pct / 100.0:
                         verdict = _verifier_run(e, body_context)
                         control_sampled += 1
-                        if pilot_dump_path is not None:
-                            _pilot_records.append({
-                                "value": e.get("value"), "type": e.get("type"),
-                                "verdict": verdict,
-                                "suspicious_reason": None,
-                                "file": str(md_path.relative_to(store_path)),
-                                "context_snippet": (body_context or "")[:200],
-                                "is_control": True,
-                            })
+                        _write_pilot({
+                            "value": e.get("value"), "type": e.get("type"),
+                            "verdict": verdict,
+                            "suspicious_reason": None,
+                            "file": _rel,
+                            "context_snippet": (body_context or "")[:200],
+                            "is_control": True,
+                        })
                         if verdict != "keep":
                             control_alerts += 1
                             print(
@@ -349,55 +422,16 @@ def scrub(
                                 f"{e.get('type')}={e.get('value')!r} → {verdict}",
                                 file=sys.stderr,
                             )
-            continue
 
-        entities_removed += removed
-        files_changed += 1
-        if verbose:
-            print(f"  {md_path.relative_to(store_path)}  (-{removed} entities)", file=sys.stderr)
+            if not dry_run:
+                post.metadata["entities"] = cleaned
+                write_atomic(md_path, frontmatter.dumps(post))
 
-        # Control-sample on the retained entities of changed files
-        if (
-            with_verifier
-            and with_verifier_control_pct > 0
-            and _verifier_run is not None
-            and _is_suspicious_fn is not None
-        ):
-            for e in cleaned:
-                if not isinstance(e, dict):
-                    continue
-                if _is_suspicious_fn(e.get("type", ""), e.get("value", "")):
-                    continue
-                if random.random() < with_verifier_control_pct / 100.0:
-                    verdict = _verifier_run(e, body_context)
-                    control_sampled += 1
-                    if pilot_dump_path is not None:
-                        _pilot_records.append({
-                            "value": e.get("value"), "type": e.get("type"),
-                            "verdict": verdict,
-                            "suspicious_reason": None,
-                            "file": str(md_path.relative_to(store_path)),
-                            "context_snippet": (body_context or "")[:200],
-                            "is_control": True,
-                        })
-                    if verdict != "keep":
-                        control_alerts += 1
-                        print(
-                            f"zkm-ner: CONTROL-SAMPLE ALERT: "
-                            f"{e.get('type')}={e.get('value')!r} → {verdict}",
-                            file=sys.stderr,
-                        )
+            _mark_done()
 
-        if not dry_run:
-            post.metadata["entities"] = cleaned
-            write_atomic(md_path, frontmatter.dumps(post))
-
-    if pilot_dump_path is not None and _pilot_records:
-        import json
-        pilot_dump_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(pilot_dump_path, "w", encoding="utf-8") as fh:
-            for rec in _pilot_records:
-                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    finally:
+        if _pilot_fh is not None:
+            _pilot_fh.close()
 
     return {
         "files_scanned": total,
@@ -406,5 +440,5 @@ def scrub(
         "entities_dropped_by_verifier": entities_dropped_by_verifier,
         "control_sampled": control_sampled,
         "control_alerts": control_alerts,
-        "pilot_records": len(_pilot_records),
+        "pilot_records": _pilot_count,
     }
