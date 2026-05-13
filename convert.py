@@ -91,15 +91,37 @@ def _process_file(
         return
 
     body = post.content
-    body_sha256 = hashlib.sha256(body.encode()).hexdigest()
+    sig_block: str = post.get("signature_block") or ""
+    sal_block: str = post.get("salutation_block") or ""
 
-    cached = cache.get(body_sha256, model_name=model_name, model_version=model_version)
+    # Cache key covers all text sections so scope-tagged entities are invalidated
+    # when signature_block / salutation_block change after a re-render.
+    combined = body + "\x00" + sig_block + "\x00" + sal_block
+    combined_sha256 = hashlib.sha256(combined.encode()).hexdigest()
+
+    cached = cache.get(combined_sha256, model_name=model_name, model_version=model_version)
     if cached is not None:
         entities = cached
     else:
         lang = forced_lang or post.get("lang") or None
-        entities = [e.as_dict() for e in extract(body, lang=lang, gazetteer_path=gazetteer_path, model=model_name)]
-        cache.put(body_sha256, entities, model_name=model_name, model_version=model_version)
+        kwargs = dict(lang=lang, gazetteer_path=gazetteer_path, model=model_name)
+
+        body_entities = [e.as_dict() for e in extract(body, **kwargs)]
+
+        sig_entities: list = []
+        if sig_block:
+            for e in extract(sig_block, **kwargs):
+                e.scope = "signature"
+                sig_entities.append(e.as_dict())
+
+        sal_entities: list = []
+        if sal_block:
+            for e in extract(sal_block, **kwargs):
+                e.scope = "salutation"
+                sal_entities.append(e.as_dict())
+
+        entities = body_entities + sig_entities + sal_entities
+        cache.put(combined_sha256, entities, model_name=model_name, model_version=model_version)
 
     if not entities:
         return
