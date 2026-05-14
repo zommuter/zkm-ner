@@ -10,7 +10,7 @@ description: >
 creates_dirs: []
 
 config:
-  ZKM_NER_MODEL:
+  model:
     required: false
     default: "spacy"
     description: >
@@ -21,15 +21,27 @@ config:
       longer than that have their tail silently ignored. Use "gliner" only for
       short-document corpora or benchmarking; "spacy" is the correct default for
       mixed-length email stores.
-  ZKM_NER_LANG:
+  lang:
     required: false
     default: ""
     description: >
       Force a language code ("de" or "en") for all documents, skipping langdetect.
       Leave empty for automatic doc-level detection.
-  ZKM_NER_GAZETTEER:
+  gazetteer:
     required: false
     default: ""
     description: >
       Path to a YAML gazetteer file for org canonicalisation. When empty the
       bundled gazetteers/orgs.yaml is used.
+  verifier_model:
+    required: false
+    default: ""
+    description: LLM model for entity verification. Falls back to core llm.model config.
+  verifier_endpoint:
+    required: false
+    default: ""
+    description: LLM endpoint for entity verification. Falls back to core llm.endpoint config.
+  verifier_key:
+    required: false
+    default: ""
+    description: API key for the verifier LLM. Falls back to core llm.key config.

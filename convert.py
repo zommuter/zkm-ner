@@ -33,9 +33,9 @@ def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
     from zkm_ner.extract import extract
     from zkm.extraction_cache import ExtractionCache
 
-    model_name = config.get("ZKM_NER_MODEL", "spacy").strip() or "spacy"
-    forced_lang = config.get("ZKM_NER_LANG", "").strip() or None
-    gazetteer_path = config.get("ZKM_NER_GAZETTEER", "").strip() or None
+    model_name = str(config.get("model", "spacy") or "spacy").strip() or "spacy"
+    forced_lang = str(config.get("lang", "") or "").strip() or None
+    gazetteer_path = str(config.get("gazetteer", "") or "").strip() or None
 
     from zkm_ner.version import model_version
 
@@ -271,17 +271,11 @@ def scrub(
         from zkm_ner.suspicious import is_suspicious as _is_suspicious_fn  # type: ignore[assignment]
         from zkm_ner.verifier import verify as _verify_fn
 
-        _v_model = (
-            config.get("ZKM_NER_VERIFIER_MODEL")
-            or config.get("ZKM_LLM_MODEL", "")
-            or "aya-expanse-8b"
-        )
-        _v_endpoint = (
-            config.get("ZKM_NER_VERIFIER_ENDPOINT")
-            or config.get("ZKM_LLM_ENDPOINT", "")
-            or "http://localhost:8080"
-        )
-        _v_key = config.get("ZKM_NER_VERIFIER_KEY") or config.get("ZKM_LLM_API_KEY", "")
+        from zkm.config import load_config as _load_config
+        _store_cfg = _load_config(store_path)
+        _v_model = str(config.get("verifier_model") or _store_cfg.core_value("llm", "model") or "aya-expanse-8b")
+        _v_endpoint = str(config.get("verifier_endpoint") or _store_cfg.core_value("llm", "endpoint") or "http://localhost:8080")
+        _v_key = str(config.get("verifier_key") or _store_cfg.core_value("llm", "key") or "")
         _verifier_cache = ExtractionCache(store_path, extractor_name="ner_verifier")
 
         def _verifier_run(e: Any, context: str | None) -> str:
