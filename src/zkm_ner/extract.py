@@ -22,11 +22,16 @@ def extract(
     lang: str | None = None,
     model: str = "spacy",
     gazetteer_path: str | None = None,
+    user_salutations: frozenset[str] | None = None,
 ) -> list[Entity]:
     """Return deduplicated entity mentions extracted from *body*.
 
     Pattern overlay runs first; any NER span that overlaps a pattern span is
     dropped (patterns win).  Final list is deduped on (type, value).
+
+    *user_salutations* should be the pre-built frozenset from
+    ``build_user_salutations(user_names)``; build it once per convert/scrub run
+    and pass the same set here for every document.
     """
     body = strip_markdown_artefacts(body)
     pattern_ents = _extract_patterns(body, gazetteer_path=gazetteer_path)
@@ -46,7 +51,8 @@ def extract(
             continue
         merged.append(ner_ent)
 
-    return _dedup(drop_section_link_artefacts(drop_salutation_blocklist(drop_structural_artefacts(drop_commonnoun_stoplist(drop_stoplist(merged))))))
+    extra = user_salutations or frozenset()
+    return _dedup(drop_section_link_artefacts(drop_salutation_blocklist(drop_structural_artefacts(drop_commonnoun_stoplist(drop_stoplist(merged))), extra=extra)))
 
 
 # ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ if _venv_site:
 from zkm.amendments import apply_queue, emit
 
 PLUGIN_NAME = "ner"
-PLUGIN_VERSION = "0.1.0"
+PLUGIN_VERSION = "0.14.0"
 
 
 def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
@@ -30,17 +30,28 @@ def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
 
     Returns [] — amender pattern.
     """
+    import hashlib
+
     from zkm_ner.extract import extract
+    from zkm_ner.textfilter import build_user_salutations
     from zkm.extraction_cache import ExtractionCache
 
     model_name = str(config.get("model", "spacy") or "spacy").strip() or "spacy"
     forced_lang = str(config.get("lang", "") or "").strip() or None
     gazetteer_path = str(config.get("gazetteer", "") or "").strip() or None
+    user_sal = build_user_salutations(config.get("user_names"))
+
+    # Stable cache-key component for user_names: hash of sorted normalised names.
+    if user_sal:
+        _names_repr = repr(sorted(user_sal))
+        user_names_hash = hashlib.sha256(_names_repr.encode()).hexdigest()[:8]
+    else:
+        user_names_hash = ""
 
     from zkm_ner.version import model_version
 
     cache = ExtractionCache(store_path, extractor_name=PLUGIN_NAME)
-    version = model_version(model_name)
+    version = model_version(model_name, user_names_hash=user_names_hash)
 
     md_files = sorted(store_path.rglob("*.md"))
     total = len(md_files)
@@ -55,6 +66,7 @@ def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
             model_version=version,
             forced_lang=forced_lang,
             gazetteer_path=gazetteer_path,
+            user_sal=user_sal,
         )
         if progress:
             progress(i, total, str(md_path.relative_to(store_path)))
@@ -81,6 +93,7 @@ def _process_file(
     model_version: str,
     forced_lang: str | None,
     gazetteer_path: str | None,
+    user_sal: frozenset,
 ) -> None:
     import hashlib
     import frontmatter
@@ -104,7 +117,7 @@ def _process_file(
         entities = cached
     else:
         lang = forced_lang or post.get("lang") or None
-        kwargs = dict(lang=lang, gazetteer_path=gazetteer_path, model=model_name)
+        kwargs = dict(lang=lang, gazetteer_path=gazetteer_path, model=model_name, user_salutations=user_sal)
 
         body_entities = [e.as_dict() for e in extract(body, **kwargs)]
 
@@ -172,7 +185,17 @@ def scrub(
     import frontmatter
 
     from zkm.atomic import write_atomic
-    from zkm_ner.textfilter import _COMMONNOUN_STOPLIST, _RE_SECTION_LINK_ARTIFACT, _RE_STRUCTURAL_ARTEFACT, _SALUTATION_BLOCKLIST, _STOPLIST
+    from zkm_ner.textfilter import (
+        _COMMONNOUN_STOPLIST,
+        _RE_SECTION_LINK_ARTIFACT,
+        _RE_STRUCTURAL_ARTEFACT,
+        _SALUTATION_BLOCKLIST,
+        _STOPLIST,
+        build_user_salutations,
+    )
+
+    _user_sal = build_user_salutations(config.get("user_names"))
+    _effective_salutation_blocklist = _SALUTATION_BLOCKLIST | _user_sal
 
     md_files = [
         p for p in sorted(store_path.rglob("*.md"))
@@ -294,7 +317,7 @@ def scrub(
             return False
         value = e.get("value", "")
         value_lower = value.strip().lower()
-        if value_lower in _STOPLIST or value_lower in _COMMONNOUN_STOPLIST or value_lower in _SALUTATION_BLOCKLIST:
+        if value_lower in _STOPLIST or value_lower in _COMMONNOUN_STOPLIST or value_lower in _effective_salutation_blocklist:
             return True
         if _RE_STRUCTURAL_ARTEFACT.match(value):
             return True

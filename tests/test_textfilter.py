@@ -1,9 +1,9 @@
-"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist; N9c-8: structural artefacts; N9c-10: section link artefacts; N9f: salutation blocklist."""
+"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist; N9c-8: structural artefacts; N9c-10: section link artefacts; N9f: salutation blocklist; user-names runtime config."""
 
 import pytest
 
 from zkm_ner._types import Entity
-from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_salutation_blocklist, drop_section_link_artefacts, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
+from zkm_ner.textfilter import build_user_salutations, drop_commonnoun_stoplist, drop_salutation_blocklist, drop_section_link_artefacts, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +173,78 @@ def test_drop_salutation_blocklist_keeps_real_names():
 
 def test_drop_salutation_blocklist_empty_list():
     assert drop_salutation_blocklist([]) == []
+
+
+# ---------------------------------------------------------------------------
+# build_user_salutations + drop_salutation_blocklist extra kwarg (user-names feature)
+# ---------------------------------------------------------------------------
+
+def test_build_user_salutations_returns_greeting_phrase_set():
+    """build_user_salutations(['Tobias', 'Kienzler']) generates 'hallo tobias' and 'guten tag herr kienzler'."""
+    sal = build_user_salutations(["Tobias", "Kienzler"])
+    assert "hallo tobias" in sal
+    assert "hello tobias" in sal
+    assert "guten tag herr kienzler" in sal
+    assert "sehr geehrter herr kienzler" in sal
+
+
+def test_build_user_salutations_bare_names_not_in_set():
+    """Bare names must never be in the output — only prefix+name pairs."""
+    sal = build_user_salutations(["Tobias", "Kienzler"])
+    assert "tobias" not in sal
+    assert "kienzler" not in sal
+
+
+def test_build_user_salutations_accepts_string_input():
+    """Comma-separated or newline-separated string input is also accepted (hand-edited YAML)."""
+    sal_comma = build_user_salutations("Tobias, Kienzler")
+    sal_newline = build_user_salutations("Tobias\nKienzler")
+    assert "hallo tobias" in sal_comma
+    assert "hallo kienzler" in sal_comma
+    assert sal_comma == sal_newline
+
+
+def test_build_user_salutations_empty_input():
+    """Empty, None, empty-list, and blank-string inputs all return an empty frozenset."""
+    assert build_user_salutations(None) == frozenset()
+    assert build_user_salutations([]) == frozenset()
+    assert build_user_salutations("") == frozenset()
+    assert build_user_salutations(["", "  "]) == frozenset()
+
+
+def test_build_user_salutations_normalises_whitespace():
+    """Internal whitespace in multi-word names is normalised; leading/trailing stripped."""
+    sal = build_user_salutations(["  Tobias  Kienzler  "])
+    assert "hallo tobias kienzler" in sal
+
+
+def test_drop_salutation_blocklist_extra_removes_user_greeting():
+    """With extra= set, user-specific greetings are removed in addition to the static list."""
+    user_sal = build_user_salutations(["Tobias"])
+    entities = [
+        Entity(type="person", value="Hallo Tobias"),
+        Entity(type="person", value="Hello Tobias"),
+        Entity(type="person", value="Tobias Kienzler"),  # legit — bare full name
+        Entity(type="person", value="Best Regards"),     # static blocklist entry
+    ]
+    result = drop_salutation_blocklist(entities, extra=user_sal)
+    values = [e.value for e in result]
+    assert "Hallo Tobias" not in values
+    assert "Hello Tobias" not in values
+    assert "Best Regards" not in values
+    assert "Tobias Kienzler" in values  # bare full name survives
+
+
+def test_drop_salutation_blocklist_no_extra_unchanged_behaviour():
+    """Calling without extra= preserves the original static-blocklist-only behaviour."""
+    entities = [
+        Entity(type="person", value="Hallo Tobias"),  # NOT in static list
+        Entity(type="person", value="Hallo Maxine"),  # IS in static list
+    ]
+    result = drop_salutation_blocklist(entities)
+    values = [e.value for e in result]
+    assert "Hallo Tobias" in values     # not filtered without extra=
+    assert "Hallo Maxine" not in values  # static entry still filtered
 
 
 # ---------------------------------------------------------------------------

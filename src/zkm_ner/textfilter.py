@@ -20,6 +20,7 @@ Post-extraction:  drop_section_link_artefacts(entities) -> list[Entity]
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
 from zkm_ner._types import Entity
 
@@ -63,6 +64,53 @@ _SALUTATION_BLOCKLIST: frozenset[str] = frozenset({
     "mit besten grüßen",
 })
 
+# Greeting/salutation prefixes (lowercased) used for cross-product with user-supplied names.
+# Each entry is combined with a user name to generate blocked phrases like "hallo tobias",
+# "guten tag herr kienzler", etc.  Bare names are never in this list — only prefix+name pairs
+# are generated, so a legitimate "Tobias Kienzler" PERSON entity is never blocked.
+_GREETING_PREFIXES: frozenset[str] = frozenset({
+    # Informal greetings (DE + EN)
+    "hallo", "hello", "hi", "hey",
+    # Formal/polite (DE)
+    "guten tag", "guten morgen", "guten abend",
+    "sehr geehrter herr", "sehr geehrte frau",
+    "lieber", "liebe", "liebes",
+    "lieber herr", "liebe frau",
+    # Honorific without greeting word (DE)
+    "herr", "frau",
+    # With honorific attached to greeting word
+    "hallo herr", "hallo frau",
+    "guten tag herr", "guten tag frau",
+    # Formal (EN)
+    "dear",
+})
+
+
+def build_user_salutations(names: list | str | None) -> frozenset[str]:
+    """Return a frozenset of lowercase greeting phrases derived from *names*.
+
+    Accepts a list of strings (from YAML config) or a single string (comma- or
+    newline-separated).  Each name form is cross-producted with ``_GREETING_PREFIXES``
+    to produce phrases like "hallo tobias", "guten tag herr kienzler".
+    Bare names are never included — only prefix+name pairs.
+    Returns an empty frozenset when *names* is absent or empty.
+    """
+    if not names:
+        return frozenset()
+    if isinstance(names, str):
+        raw: Iterable[str] = re.split(r"[,\n]+", names)
+    else:
+        raw = names
+    normalised = [" ".join(n.split()) for n in raw if n and n.strip()]
+    if not normalised:
+        return frozenset()
+    return frozenset(
+        f"{prefix} {name}".lower()
+        for prefix in _GREETING_PREFIXES
+        for name in normalised
+    )
+
+
 # Common-noun and abbreviation false positives from the NER pilot (class 4 pollution).
 # Values that spaCy may tag as PROPN in some contexts but are never real entities.
 _COMMONNOUN_STOPLIST: frozenset[str] = frozenset({
@@ -90,9 +138,17 @@ def drop_stoplist(entities: list[Entity]) -> list[Entity]:
     return [e for e in entities if e.value.strip().lower() not in _STOPLIST]
 
 
-def drop_salutation_blocklist(entities: list[Entity]) -> list[Entity]:
-    """Remove entities whose value is a known multi-word salutation or sign-off (class 6 pollution)."""
-    return [e for e in entities if e.value.strip().lower() not in _SALUTATION_BLOCKLIST]
+def drop_salutation_blocklist(
+    entities: list[Entity],
+    extra: frozenset[str] = frozenset(),
+) -> list[Entity]:
+    """Remove entities whose value is a known salutation/sign-off or a user-generated greeting phrase.
+
+    *extra* should be the result of ``build_user_salutations(user_names)``; when omitted
+    only the static blocklist applies (preserving existing behaviour).
+    """
+    blocked = _SALUTATION_BLOCKLIST | extra
+    return [e for e in entities if e.value.strip().lower() not in blocked]
 
 
 def drop_commonnoun_stoplist(entities: list[Entity]) -> list[Entity]:

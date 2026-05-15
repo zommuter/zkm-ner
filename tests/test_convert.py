@@ -65,7 +65,7 @@ def test_convert_cache_hit_skips_extractor(tmp_path):
 
     call_count = [0]
 
-    def counting_extract(body, *, lang=None, gazetteer_path=None, model="spacy"):
+    def counting_extract(body, *, lang=None, gazetteer_path=None, model="spacy", user_salutations=None):
         call_count[0] += 1
         return [_EntityStub("person", "Test")]
 
@@ -92,7 +92,7 @@ def test_convert_cache_miss_populates_cache(tmp_path):
 
     call_count = [0]
 
-    def counting_extract(body, *, lang=None, gazetteer_path=None, model="spacy"):
+    def counting_extract(body, *, lang=None, gazetteer_path=None, model="spacy", user_salutations=None):
         call_count[0] += 1
         return [_EntityStub("person", "Test")]
 
@@ -157,7 +157,7 @@ def test_convert_body_sha256_stable_after_frontmatter_amendment(tmp_path):
 
     call_count = [0]
 
-    def counting_extract(body, *, lang=None, gazetteer_path=None, model="spacy"):
+    def counting_extract(body, *, lang=None, gazetteer_path=None, model="spacy", user_salutations=None):
         call_count[0] += 1
         return [_EntityStub("person", "Someone")]
 
@@ -217,7 +217,7 @@ def test_signature_block_entities_get_signature_scope(tmp_path):
 
     calls: list[str] = []
 
-    def scoped_extract(text, *, lang=None, gazetteer_path=None, model="spacy"):
+    def scoped_extract(text, *, lang=None, gazetteer_path=None, model="spacy", user_salutations=None):
         calls.append(text)
         if "alice@example.com" in text:
             return [_EntityObj("email_address", "alice@example.com")]
@@ -246,7 +246,7 @@ def test_salutation_block_entities_get_salutation_scope(tmp_path):
     sal = "Dear John Doe,"
     make_md(store / "mail", "msg.md", body=body, salutation_block=sal)
 
-    def scoped_extract(text, *, lang=None, gazetteer_path=None, model="spacy"):
+    def scoped_extract(text, *, lang=None, gazetteer_path=None, model="spacy", user_salutations=None):
         if "John Doe" in text:
             return [_EntityObj("person", "John Doe")]
         return []
@@ -290,6 +290,35 @@ def test_body_entities_default_scope_unaffected(tmp_path):
     )
 
 
+# ---------------------------------------------------------------------------
+# model_version cache-key for user_names
+# ---------------------------------------------------------------------------
+
+
+def test_model_version_includes_textfilter_v6():
+    """model_version must contain 'textfilter-v6' after the user-names feature bump."""
+    from zkm_ner.version import model_version
+    ver = model_version("spacy")
+    assert "textfilter-v6" in ver
+    assert "textfilter-v5" not in ver
+
+
+def test_model_version_differs_with_user_names_hash():
+    """Providing a non-empty user_names_hash must produce a different version string."""
+    from zkm_ner.version import model_version
+    ver_base = model_version("spacy")
+    ver_with = model_version("spacy", user_names_hash="abc12345")
+    assert ver_base != ver_with
+    assert "usernames:abc12345" in ver_with
+    assert "usernames:" not in ver_base
+
+
+def test_model_version_stable_with_empty_hash():
+    """Empty user_names_hash must not change the version string."""
+    from zkm_ner.version import model_version
+    assert model_version("spacy") == model_version("spacy", user_names_hash="")
+
+
 def test_cache_key_includes_signature_block(tmp_path):
     """Adding a signature_block to a file must cause a cache miss (new combined key)."""
     store = make_store(tmp_path)
@@ -298,7 +327,7 @@ def test_cache_key_includes_signature_block(tmp_path):
 
     call_count = [0]
 
-    def counting_extract(text, *, lang=None, gazetteer_path=None, model="spacy"):
+    def counting_extract(text, *, lang=None, gazetteer_path=None, model="spacy", user_salutations=None):
         call_count[0] += 1
         return []
 
