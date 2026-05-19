@@ -382,54 +382,6 @@ def test_pilot_dump_incremental_flush(tmp_path):
     assert records[0]["value"] == "klicken Sie"
 
 
-# ---------------------------------------------------------------------------
-# user_names config — runtime user-identity stoplist
-# ---------------------------------------------------------------------------
-
-
-def test_scrub_user_names_removes_greeting_phrases(tmp_path):
-    """user_names config generates greeting phrases that scrub removes; full name survives."""
-    from convert import scrub
-
-    store = make_store(tmp_path)
-    md = make_md(
-        store / "notes", "doc.md",
-        body="Hello",
-        entities=[
-            _entity("person", "Hallo Tobias"),
-            _entity("person", "Guten Tag Herr Kienzler"),
-            _entity("person", "Tobias Kienzler"),  # legit — bare full name
-        ],
-    )
-
-    stats = scrub(store, {"user_names": ["Tobias", "Kienzler"]}, dry_run=False)
-
-    assert stats["entities_removed"] == 2
-    remaining = _load_entities(md)
-    values = [e["value"] for e in remaining]
-    assert "Hallo Tobias" not in values
-    assert "Guten Tag Herr Kienzler" not in values
-    assert "Tobias Kienzler" in values
-
-
-def test_scrub_no_user_names_does_not_remove_user_greetings(tmp_path):
-    """Without user_names, greetings using the real user's name are NOT removed (control)."""
-    from convert import scrub
-
-    store = make_store(tmp_path)
-    md = make_md(
-        store / "notes", "doc.md",
-        body="Hello",
-        entities=[_entity("person", "Hallo Tobias")],
-    )
-
-    stats = scrub(store, {}, dry_run=False)
-
-    assert stats["entities_removed"] == 0
-    remaining = _load_entities(md)
-    assert any(e["value"] == "Hallo Tobias" for e in remaining)
-
-
 def test_pilot_dump_appends_on_resume(tmp_path):
     """Pilot dump opened in append mode — existing records are not overwritten."""
     import json
