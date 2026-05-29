@@ -295,12 +295,12 @@ def test_body_entities_default_scope_unaffected(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_model_version_includes_textfilter_v7():
-    """model_version must contain 'textfilter-v7' after the user-names removal bump."""
+def test_model_version_includes_textfilter_v8():
+    """model_version must contain 'textfilter-v8' after the N9c-html HTML-entity filter."""
     from zkm_ner.version import model_version
     ver = model_version("spacy")
-    assert "textfilter-v7" in ver
-    assert "textfilter-v6" not in ver
+    assert "textfilter-v8" in ver
+    assert "textfilter-v7" not in ver
     assert "usernames:" not in ver
 
 

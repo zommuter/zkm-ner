@@ -1,9 +1,9 @@
-"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist; N9c-8: structural artefacts; N9c-10: section link artefacts; N9f: salutation blocklist."""
+"""Tests for zkm_ner.textfilter — N9b: markdown pre-strip + header stoplist; N9c: commonnoun stoplist; N9c-8: structural artefacts; N9c-10: section link artefacts; N9c-html: HTML-entity artefacts; N9f: salutation blocklist."""
 
 import pytest
 
 from zkm_ner._types import Entity
-from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_salutation_blocklist, drop_section_link_artefacts, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
+from zkm_ner.textfilter import drop_commonnoun_stoplist, drop_html_entity_artefacts, drop_salutation_blocklist, drop_section_link_artefacts, drop_stoplist, drop_structural_artefacts, strip_markdown_artefacts
 
 
 # ---------------------------------------------------------------------------
@@ -225,3 +225,51 @@ def test_drop_section_link_artefacts_keeps_legitimate_references():
 
 def test_drop_section_link_artefacts_empty_list():
     assert drop_section_link_artefacts([]) == []
+
+
+# ---------------------------------------------------------------------------
+# drop_html_entity_artefacts (N9c-html — HTML-entity run fragments)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("value", [
+    "&gt;",
+    "&nbsp;",
+    "&amp;",
+    "&gt;&nbsp;",
+    "&gt;&nbsp;&gt;",
+    "&gt; &nbsp;",
+    "&lt;br&gt;",
+    "&nbsp;&nbsp;&nbsp;",
+])
+def test_drop_html_entity_artefacts_removes_entity_runs(value):
+    """Short HTML-entity runs (≤30 chars, contains '&') must be dropped."""
+    entities = [Entity(type="org", value=value)]
+    assert drop_html_entity_artefacts(entities) == []
+
+
+def test_drop_html_entity_artefacts_respects_length_cap():
+    """Values longer than 30 chars must NOT be dropped (handled by scrub layer)."""
+    long_run = "&gt;&nbsp;" * 4  # 40 chars
+    entities = [Entity(type="org", value=long_run)]
+    assert drop_html_entity_artefacts(entities) == entities
+
+
+def test_drop_html_entity_artefacts_keeps_real_entities():
+    """Legitimate entities with uppercase letters or non-entity chars must be kept."""
+    real = [
+        Entity(type="person", value="Alice"),
+        Entity(type="org", value="AT&T"),        # uppercase — regex no-match
+        Entity(type="org", value="Google"),
+        Entity(type="misc", value="Section 5.1 & 6.5"),  # '.' not in entity charset
+    ]
+    assert drop_html_entity_artefacts(real) == real
+
+
+def test_drop_html_entity_artefacts_requires_ampersand():
+    """Lowercase-only strings without '&' must NOT be dropped."""
+    entities = [Entity(type="misc", value="hello")]
+    assert drop_html_entity_artefacts(entities) == entities
+
+
+def test_drop_html_entity_artefacts_empty_list():
+    assert drop_html_entity_artefacts([]) == []

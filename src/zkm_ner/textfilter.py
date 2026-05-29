@@ -15,6 +15,10 @@ Post-extraction:  drop_structural_artefacts(entities) -> list[Entity]
 Post-extraction:  drop_section_link_artefacts(entities) -> list[Entity]
     Removes entities whose value begins with "Section N]" — broken markdown
     link-target fragments left by the email→markdown converter (class 7 pollution).
+
+Post-extraction:  drop_html_entity_artefacts(entities) -> list[Entity]
+    Removes entities whose value is an HTML-entity character run (≤30 chars
+    containing '&') — quoted-reply markup from undecoded HTML bodies (N9c-html).
 """
 
 from __future__ import annotations
@@ -117,3 +121,25 @@ _RE_SECTION_LINK_ARTIFACT = re.compile(r"^Section\s+\d+\]")
 def drop_section_link_artefacts(entities: list[Entity]) -> list[Entity]:
     """Remove entities whose value begins with 'Section N]' — broken link-target artifacts."""
     return [e for e in entities if not _RE_SECTION_LINK_ARTIFACT.match(e.value)]
+
+
+# HTML-entity run fragments (N9c-html pollution):
+# Short values (≤30 chars) composed entirely of HTML-entity syntax characters — &, ;, lowercase
+# letters, digits, whitespace, # — that also contain at least one '&'.  These arise when
+# zkm-eml renders an HTML body with entities left undecoded before NER, so quoted-reply markers
+# like &gt;&nbsp; get extracted as ORG entities.  Requiring '&' prevents the regex from
+# matching unrelated lowercase strings such as common nouns already handled by other filters.
+_RE_HTML_ENTITY_ARTEFACT = re.compile(r"^[&;a-z0-9\s#]+$")
+_HTML_ENTITY_MAX_LEN = 30
+
+
+def drop_html_entity_artefacts(entities: list[Entity]) -> list[Entity]:
+    """Remove short HTML-entity character runs extracted as entities from undecoded HTML bodies."""
+    return [
+        e for e in entities
+        if not (
+            len(e.value) <= _HTML_ENTITY_MAX_LEN
+            and "&" in e.value
+            and _RE_HTML_ENTITY_ARTEFACT.match(e.value)
+        )
+    ]

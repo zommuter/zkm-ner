@@ -20,6 +20,6 @@ def model_version(model_name: str) -> str:
     try:
         de = importlib.metadata.version("de-core-news-sm")
         en = importlib.metadata.version("en-core-web-sm")
-        return f"de:{de}+en:{en}+textfilter-v7+posfilter-v1+iban-v1+email-v1+phone-v1+url-v1+invoice-v1+tracking-v1+regcode-v1+scope-blocks-v1"
+        return f"de:{de}+en:{en}+textfilter-v8+posfilter-v1+iban-v1+email-v1+phone-v1+url-v1+invoice-v1+tracking-v1+regcode-v1+scope-blocks-v1"
     except importlib.metadata.PackageNotFoundError:
         return "unknown"
