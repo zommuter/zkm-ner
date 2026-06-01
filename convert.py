@@ -71,6 +71,21 @@ def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
 # ---------------------------------------------------------------------------
 
 
+def _parse_doc_date(raw):
+    """Parse a frontmatter date value to datetime, returning None on failure."""
+    if raw is None:
+        return None
+    from datetime import date, datetime
+    if isinstance(raw, datetime):
+        return raw
+    if isinstance(raw, date):
+        return datetime(raw.year, raw.month, raw.day)
+    try:
+        return datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+
+
 def _process_file(
     md_path: Path,
     *,
@@ -104,7 +119,8 @@ def _process_file(
         entities = cached
     else:
         lang = forced_lang or post.get("lang") or None
-        kwargs = dict(lang=lang, gazetteer_path=gazetteer_path, model=model_name)
+        doc_date = _parse_doc_date(post.get("date"))
+        kwargs = dict(lang=lang, gazetteer_path=gazetteer_path, model=model_name, doc_date=doc_date)
 
         body_entities = [e.as_dict() for e in extract(body, **kwargs)]
 

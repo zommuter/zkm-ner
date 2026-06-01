@@ -7,6 +7,7 @@ Mixed-language documents use doc-level detection — the limitation is accepted.
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from functools import lru_cache
 
 import spacy
@@ -35,6 +36,9 @@ _LABEL_MAP = {
     "LANGUAGE": "misc",
 }
 
+# Temporal spaCy labels → γ type:datetime (handled separately with canonicalisation)
+_TEMPORAL_LABELS = frozenset({"DATE", "TIME"})
+
 
 @lru_cache(maxsize=4)
 def _load_model(model_name: str):
@@ -49,10 +53,17 @@ def _detect_lang(body: str) -> str:
         return "de"
 
 
-def extract_spacy(body: str, *, lang: str | None = None) -> list[Entity]:
+def extract_spacy(
+    body: str,
+    *,
+    lang: str | None = None,
+    doc_date: date | datetime | None = None,
+) -> list[Entity]:
     """Run spaCy NER on *body* and return entity mentions.
 
     *lang* overrides doc-level langdetect when supplied.
+    *doc_date* anchors relative date expressions (e.g. "Thursday") against the
+    document's own frontmatter date when canonicalising γ type:datetime entities.
     """
     if not body.strip():
         return []
@@ -65,8 +76,38 @@ def extract_spacy(body: str, *, lang: str | None = None) -> list[Entity]:
 
     results: list[Entity] = []
     for ent in doc.ents:
+        if ent.label_ in _TEMPORAL_LABELS:
+            _add_datetime_entity(ent.text, ent.start_char, ent.end_char, doc_date, effective_lang, results)
+            continue
         etype = _LABEL_MAP.get(ent.label_)
         if etype is None:
             continue
         results.append(Entity(etype, ent.text, start=ent.start_char, end=ent.end_char, root_pos=ent.root.pos_))
     return results
+
+
+def _add_datetime_entity(
+    text: str,
+    start: int,
+    end: int,
+    doc_date: date | datetime | None,
+    lang: str,
+    out: list[Entity],
+) -> None:
+    from zkm_ner.datetime_canon import canonicalise
+
+    canonical = canonicalise(text, relative_base=doc_date, lang=lang)
+    if canonical is None:
+        return  # unparseable — skip rather than emit a low-quality entity
+
+    value = text.strip()
+    out.append(Entity(
+        "datetime",
+        value,
+        # canonical must differ from value; both are strings but value is raw, canonical is ISO
+        canonical=canonical if canonical != value else None,
+        standard="ISO 8601",
+        start=start,
+        end=end,
+        root_pos="",  # bypass POS filter — temporal label is deterministic
+    ))

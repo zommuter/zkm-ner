@@ -1,12 +1,14 @@
 """Entity extractor — pattern overlay + spaCy NER (+ optional GLiNER).
 
 Public API:
-    extract(body, *, lang, model, gazetteer_path) -> list[Entity]
+    extract(body, *, lang, model, gazetteer_path, doc_date) -> list[Entity]
 
 Entity is re-exported for callers that only import from this module.
 """
 
 from __future__ import annotations
+
+from datetime import date, datetime
 
 from zkm_ner._types import Entity  # re-export
 from zkm_ner.patterns import extract_all as _extract_patterns
@@ -22,6 +24,7 @@ def extract(
     lang: str | None = None,
     model: str = "spacy",
     gazetteer_path: str | None = None,
+    doc_date: date | datetime | None = None,
 ) -> list[Entity]:
     """Return deduplicated entity mentions extracted from *body*.
 
@@ -35,7 +38,7 @@ def extract(
         from zkm_ner.gliner_backend import extract_gliner
         ner_ents = extract_gliner(body, lang=lang)
     else:
-        ner_ents = extract_spacy(body, lang=lang)
+        ner_ents = extract_spacy(body, lang=lang, doc_date=doc_date)
 
     pattern_spans = [(e.start, e.end) for e in pattern_ents if e.start >= 0]
     merged = list(pattern_ents)
