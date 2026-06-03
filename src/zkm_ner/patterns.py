@@ -194,7 +194,7 @@ def extract_social_handles(body: str) -> list[Entity]:
 # Org gazetteer
 # ---------------------------------------------------------------------------
 
-_DEFAULT_GAZETTEER = Path(__file__).parent.parent.parent / "gazetteers" / "orgs.yaml"
+_DEFAULT_GAZETTEER = Path(__file__).parent / "gazetteers" / "orgs.yaml"
 
 
 def load_gazetteer(path: str | Path | None = None) -> list[dict]:
