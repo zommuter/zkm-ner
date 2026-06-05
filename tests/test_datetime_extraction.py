@@ -50,6 +50,11 @@ class TestCanonicalise:
         result = canonicalise("not a date at all xyzzy")
         assert result is None
 
+    def test_unknown_language_does_not_raise(self) -> None:
+        # 'no' (Norwegian) and other unsupported codes must not raise ValueError
+        result = canonicalise("2026-06-15", lang="no")
+        assert result == "2026-06-15"
+
     def test_datetime_anchor(self) -> None:
         # Pass datetime instead of date — should still work
         base = datetime(2026, 6, 1, 10, 0)

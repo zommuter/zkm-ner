@@ -38,8 +38,9 @@ def canonicalise(
         )
         settings["RELATIVE_BASE"] = anchor
 
-    # Always try both DE and EN — spaCy DATE spans are language-neutral text
-    languages = ["de", "en"] if lang in (None, "de", "en") else [lang]
+    # Use de+en for any unrecognised language — dateparser raises ValueError on unknown codes
+    # (e.g. 'no' from langdetect on Norwegian text). DATE spans are often language-neutral.
+    languages = [lang] if lang in ("de", "en") else ["de", "en"]
 
     parsed = dateparser.parse(text, languages=languages, settings=settings)
     if parsed is None:
