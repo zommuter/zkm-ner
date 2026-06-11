@@ -336,3 +336,73 @@ def test_cache_key_includes_signature_block(tmp_path):
         convert(store, {})
 
     assert call_count[0] > 0, "Adding signature_block must bust the cache"
+
+
+# ---------------------------------------------------------------------------
+# Amender scoping — created= parameter (id:63bb)
+# ---------------------------------------------------------------------------
+
+def test_convert_created_restricts_sweep(tmp_path):
+    """When created= is passed, only those files are processed; others are skipped."""
+    store = make_store(tmp_path)
+    included = make_md(store / "notes", "included.md", body="Alice Smith was here.")
+    excluded = make_md(store / "notes", "excluded.md", body="Bob Jones was here.")
+
+    processed = []
+
+    def recording_extract(body, *, lang=None, gazetteer_path=None, model="spacy", doc_date=None):
+        processed.append(body)
+        return []
+
+    with (
+        patch("zkm_ner.extract.extract", side_effect=recording_extract),
+        patch("zkm_ner.version.model_version", return_value="0.0.0"),
+    ):
+        from convert import convert
+        convert(store, {}, created=[included])
+
+    assert len(processed) == 1
+    assert "Alice Smith" in processed[0]
+
+
+def test_convert_no_created_sweeps_full_store(tmp_path):
+    """When created is None (direct zkm convert ner), all md files are processed."""
+    store = make_store(tmp_path)
+    make_md(store / "notes", "a.md", body="Alpha text.")
+    make_md(store / "notes", "b.md", body="Beta text.")
+
+    processed = []
+
+    def recording_extract(body, *, lang=None, gazetteer_path=None, model="spacy", doc_date=None):
+        processed.append(body)
+        return []
+
+    with (
+        patch("zkm_ner.extract.extract", side_effect=recording_extract),
+        patch("zkm_ner.version.model_version", return_value="0.0.0"),
+    ):
+        from convert import convert
+        convert(store, {})  # created=None — full sweep
+
+    assert len(processed) == 2
+
+
+def test_convert_created_empty_list_processes_nothing(tmp_path):
+    """created=[] must result in zero files processed (no sweep at all)."""
+    store = make_store(tmp_path)
+    make_md(store / "notes", "doc.md", body="Some content.")
+
+    processed = []
+
+    def recording_extract(body, *, lang=None, gazetteer_path=None, model="spacy", doc_date=None):
+        processed.append(body)
+        return []
+
+    with (
+        patch("zkm_ner.extract.extract", side_effect=recording_extract),
+        patch("zkm_ner.version.model_version", return_value="0.0.0"),
+    ):
+        from convert import convert
+        convert(store, {}, created=[])
+
+    assert processed == []

@@ -19,8 +19,12 @@ PLUGIN_NAME = "ner"
 PLUGIN_VERSION = "0.18.0"
 
 
-def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
-    """Amend all md files in *store_path* with NER entity mentions.
+def convert(store_path: Path, config: dict, *, progress=None, created=None) -> list[Path]:
+    """Amend md files in *store_path* with NER entity mentions.
+
+    When *created* is provided (amender auto-triggered by another convert),
+    only those files are processed.  When None (direct ``zkm convert ner``),
+    the full store is swept.
 
     Returns [] — amender pattern.
     """
@@ -36,7 +40,7 @@ def convert(store_path: Path, config: dict, *, progress=None) -> list[Path]:
     cache = ExtractionCache(store_path, extractor_name=PLUGIN_NAME)
     version = model_version(model_name)
 
-    md_files = sorted(store_path.rglob("*.md"))
+    md_files = sorted(created) if created is not None else sorted(store_path.rglob("*.md"))
     total = len(md_files)
 
     for i, md_path in enumerate(md_files, 1):
