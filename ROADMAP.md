@@ -12,7 +12,7 @@ test pinning that string) in the same commit.
 
 ## Items
 
-- [ ] Exempt deterministic entity types from scrub/suspicious name-shape heuristics [ROUTINE] <!-- id:a1c2 -->
+- [x] Exempt deterministic entity types from scrub/suspicious name-shape heuristics [ROUTINE] <!-- id:a1c2 -->
   - **Acceptance**: `scrub()` applies its heuristic removal chain (stoplists,
     structural/section-link regexes, isolated-POS gate) only to NER-derived
     types (`person`, `org`, `loc`, `misc`) and unknown types; deterministic
@@ -32,7 +32,7 @@ test pinning that string) in the same commit.
     `src/zkm_ner/suspicious.py` (`_PREDICATES`). See ARCHITECTURE.md §6–7.
     Scrub-only change — no extraction-output change, no `model_version` bump.
 
-- [ ] Validate amount currency codes against a known-currency allowlist [ROUTINE] <!-- id:4352 -->
+- [x] Validate amount currency codes against a known-currency allowlist [ROUTINE] <!-- id:4352 -->
   - **Acceptance**: `extract_amounts` no longer emits `amount` entities for
     3-uppercase-letter tokens that are not currencies (`DIN 1045`, `ISO 9001`,
     `MEZ 14` produce no amount); all ISO 4217 active codes plus `BTC`/`ETH`
@@ -50,7 +50,7 @@ test pinning that string) in the same commit.
     and read-only from here, so the allowlist lives in this plugin).
     `src/zkm_ner/version.py`. ARCHITECTURE.md §2, §5.
 
-- [ ] Skip hidden directories in convert's full-store sweep [ROUTINE] <!-- id:2b76 -->
+- [x] Skip hidden directories in convert's full-store sweep [ROUTINE] <!-- id:2b76 -->
   - **Acceptance**: `convert(store, cfg)` with `created=None` ignores `.md`
     files under any dot-prefixed directory (e.g. `.zkm-state/`, `.git/`),
     using the same path predicate as `scrub()`. An explicit `created=[…]` list
@@ -81,7 +81,7 @@ test pinning that string) in the same commit.
     `src/zkm_ner/convert.py`. ARCHITECTURE.md §11. After editing deps/version,
     re-run `uv sync` so the editable install's metadata refreshes before testing.
 
-- [ ] Accept lowercase/mixed-case IBANs in the IBAN extractor [ROUTINE] <!-- id:b081 -->
+- [x] Accept lowercase/mixed-case IBANs in the IBAN extractor [ROUTINE] <!-- id:b081 -->
   - **Acceptance**: `extract_ibans` matches IBANs written in lower or mixed
     case (`de89 3704 0044 0532 0130 00`); `value` keeps the raw casing,
     `canonical` is uppercase compact, mod-97 checksum is computed on the
@@ -96,7 +96,7 @@ test pinning that string) in the same commit.
     `extract_ibans`), `src/zkm_ner/version.py`. `zkm.canonical.iban` already
     uppercases. ARCHITECTURE.md §2, §5.
 
-- [ ] Match invoice IDs glued to the keyword separator [ROUTINE] <!-- id:2512 -->
+- [x] Match invoice IDs glued to the keyword separator [ROUTINE] <!-- id:2512 -->
   - **Acceptance**: `extract_invoice_ids` matches when the separator carries no
     trailing space (`Rechnungsnummer:12345`, `Invoice #12345`) in addition to
     the current spaced forms; a keyword with NO separator at all

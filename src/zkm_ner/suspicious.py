@@ -86,6 +86,8 @@ _PREDICATES: dict[str, Callable[[str], str | None]] = {
     "invoice_id": _no_suspicion,
     "tracking_id": _no_suspicion,
     "registration_code": _no_suspicion,
+    # Datetime — canonicalisation already validated the span
+    "datetime": _no_suspicion,
 }
 
 
