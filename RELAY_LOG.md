@@ -43,3 +43,7 @@ referenced by any roadmap item here.
 ## 2026-06-12 21:45 — reviewer (claude-fable-5)
 
 Handoff: first ARCHITECTURE.md (11 decisions); ROADMAP 6 ROUTINE + 1 HARD backed by 24 verified-red tests: scrub's type-agnostic POS gate deletes valid datetime entities; 3-uppercase+number amount FPs (DIN 1045/ISO 9001 confirmed); convert sweeps hidden dirs scrub skips; 4-way version drift 0.18.1/0.18.0; lowercase IBANs; invoice regex gaps. HARD: scrub/extraction-cache coherence (scrubbed entities resurrect via cached set-union). Gated id:6f3a + N9e listed; id:1098/f631 noted pending user verification, untouched. 284 baseline green.
+
+## 2026-06-12 23:30 — executor (sonnet, relay-loop)
+
+Closed 5 of 6 ROUTINE items: a1c2 (deterministic-type scrub exemption), 2b76 (convert hidden-dir skip), 2512 (invoice glued separator), b081 (IBAN lowercase), 4352 (amount currency allowlist); 300 tests pass, 2 remain red (df05 version-tag item, executor-blocked).
