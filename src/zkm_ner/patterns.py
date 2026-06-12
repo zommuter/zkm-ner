@@ -230,7 +230,7 @@ def extract_gazetteer(body: str, entries: list[dict]) -> list[Entity]:
 # Negative lookbehind/lookahead prevent matching inside longer tokens.
 _IBAN_RE = re.compile(
     r"(?<![A-Za-z0-9])"
-    r"[A-Z]{2}\d{2}(?:[ \-]?[A-Z0-9]){11,34}"
+    r"(?i:[A-Z]{2})\d{2}(?:[ \-]?[A-Z0-9]){11,34}"
     r"(?![A-Za-z0-9])",
     re.ASCII,
 )
@@ -261,7 +261,9 @@ def extract_ibans(body: str) -> list[Entity]:
         if not (_IBAN_COMPACT_MIN <= len(compact) <= _IBAN_COMPACT_MAX):
             continue
         canonical_str = _canonical_iban(raw)
-        valid = _mod97(compact) == 1
+        # mod-97 checksum must use uppercased compact form (letter→digit mapping
+        # assumes uppercase A=10..Z=35); raw value keeps original casing per spec.
+        valid = _mod97(compact.upper()) == 1
         results.append(Entity(
             "iban",
             raw,
@@ -281,6 +283,46 @@ def extract_ibans(body: str) -> list[Entity]:
 # Multi-char symbols first so the alternation is greedy-correct.
 _CURR_SYMS = r"SFr\.|SFr|Fr\.|Fr|€|£|\$|¥"
 _CURR_CODES = r"[A-Z]{3}"
+
+# ISO 4217 active currency codes (alphabetically sorted) + BTC/ETH.
+# Source: ISO 4217 maintenance agency list, current as of 2025.
+# Used as a post-match allowlist in extract_amounts so that non-currency
+# 3-letter tokens (DIN, ISO, MEZ, …) are rejected without touching the regex.
+_ISO_4217_ACTIVE: frozenset[str] = frozenset({
+    "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD", "AWG", "AZN",
+    "BAM", "BBD", "BDT", "BGN", "BHD", "BIF", "BMD", "BND", "BOB", "BOV",
+    "BRL", "BSD", "BTN", "BWP", "BYN", "BZD",
+    "CAD", "CDF", "CHE", "CHF", "CHW", "CLF", "CLP", "CNY", "COP", "COU",
+    "CRC", "CUC", "CUP", "CVE", "CZK",
+    "DJF", "DKK", "DOP", "DZD",
+    "EGP", "ERN", "ETB", "EUR",
+    "FJD", "FKP",
+    "GBP", "GEL", "GHS", "GIP", "GMD", "GNF", "GTQ", "GYD",
+    "HKD", "HNL", "HRK", "HTG", "HUF",
+    "IDR", "ILS", "INR", "IQD", "IRR", "ISK",
+    "JMD", "JOD", "JPY",
+    "KES", "KGS", "KHR", "KMF", "KPW", "KRW", "KWD", "KYD", "KZT",
+    "LAK", "LBP", "LKR", "LRD", "LSL", "LYD",
+    "MAD", "MDL", "MGA", "MKD", "MMK", "MNT", "MOP", "MRU", "MUR", "MVR",
+    "MWK", "MXN", "MXV", "MYR", "MZN",
+    "NAD", "NGN", "NIO", "NOK", "NPR", "NZD",
+    "OMR",
+    "PAB", "PEN", "PGK", "PHP", "PKR", "PLN", "PYG",
+    "QAR",
+    "RON", "RSD", "RUB", "RWF",
+    "SAR", "SBD", "SCR", "SDG", "SEK", "SGD", "SHP", "SLL", "SOS", "SRD",
+    "SSP", "STN", "SVC", "SYP", "SZL",
+    "THB", "TJS", "TMT", "TND", "TOP", "TRY", "TTD", "TWD", "TZS",
+    "UAH", "UGX", "USD", "USN", "UYI", "UYU", "UYW", "UZS",
+    "VES", "VND", "VUV",
+    "WST",
+    "XAF", "XAG", "XAU", "XBA", "XBB", "XBC", "XBD", "XCD", "XDR", "XOF",
+    "XPD", "XPF", "XPT", "XSU", "XTS", "XUA", "XXX",
+    "YER",
+    "ZAR", "ZMW", "ZWL",
+    # Crypto
+    "BTC", "ETH",
+})
 
 # Number body: digits + grouping separators, avoiding consuming the '.' in '.-'.
 # \.(?!-) matches a period only when NOT followed by '-', preventing greedy
@@ -303,13 +345,24 @@ _AMOUNT_RE = re.compile(
 
 
 def extract_amounts(body: str) -> list[Entity]:
-    """Extract monetary amounts; canonical form via ``zkm.canonical.amount``."""
+    """Extract monetary amounts; canonical form via ``zkm.canonical.amount``.
+
+    3-letter currency codes are validated against the ISO 4217 active-code
+    allowlist (plus BTC/ETH); non-currency 3-letter tokens (DIN, ISO, MEZ, …)
+    are silently rejected.  Symbol forms (€, SFr., …) bypass the allowlist.
+    """
     results: list[Entity] = []
     for m in _AMOUNT_RE.finditer(body):
         raw = m.group(0).strip()
+        # Strip trailing sentence punctuation that the greedy number pattern
+        # may have consumed as a grouping separator (e.g. "250.00,").
+        raw = re.sub(r"[,;:]+$", "", raw)
         try:
             decimal_str, currency_code = _canonical_amount(raw)
         except Exception:
+            continue
+        # Reject if the 3-letter code is not a known ISO 4217 currency (or crypto).
+        if currency_code and len(currency_code) == 3 and currency_code.upper() not in _ISO_4217_ACTIVE:
             continue
         canonical = decimal_str if decimal_str != raw else None
         results.append(Entity(
@@ -331,7 +384,7 @@ def extract_amounts(body: str) -> list[Entity]:
 _INVOICE_KEYWORD_RE = re.compile(
     r"(?:Rechnungs(?:nummer|nr\.?)|Re\.?[-\s]Nr\.?|Invoice\s*(?:No\.?|#|Number)|"
     r"Belegnummer|Beleg-?Nr\.?|Billing\s*(?:Ref(?:\.?|erence)?|No\.?))"
-    r"(?:\s*[:\-=])?\s+"
+    r"(?:(?:\s*[:\-=])\s*|\s+|(?<=\#))"
     r"([A-Z0-9][A-Z0-9\-_./]{2,24})",
     re.IGNORECASE,
 )
