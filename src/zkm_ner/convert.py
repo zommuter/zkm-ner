@@ -40,7 +40,13 @@ def convert(store_path: Path, config: dict, *, progress=None, created=None) -> l
     cache = ExtractionCache(store_path, extractor_name=PLUGIN_NAME)
     version = model_version(model_name)
 
-    md_files = sorted(created) if created is not None else sorted(store_path.rglob("*.md"))
+    if created is not None:
+        md_files = sorted(created)
+    else:
+        md_files = [
+            p for p in sorted(store_path.rglob("*.md"))
+            if not any(part.startswith(".") for part in p.relative_to(store_path).parts[:-1])
+        ]
     total = len(md_files)
 
     for i, md_path in enumerate(md_files, 1):
@@ -308,9 +314,36 @@ def scrub(
                 cache=_verifier_cache,
             )
 
+    # Deterministic types are structurally validated at extraction time;
+    # scrub's stoplists and isolated-POS gate were designed for spaCy
+    # person/org/loc/misc false positives and must not second-guess them.
+    _DETERMINISTIC_TYPES = frozenset({
+        "datetime",
+        "amount",
+        "iban",
+        "email_address",
+        "phone_number",
+        "url",
+        "org_hint",
+        "linkedin_profile",
+        "github_profile",
+        "invoice_id",
+        "tracking_id",
+        "registration_code",
+    })
+
     def _is_heuristic_candidate(e: Any) -> bool:
-        """Return True if heuristic rules flag *e* for removal."""
+        """Return True if heuristic rules flag *e* for removal.
+
+        Deterministic types (datetime, pattern-overlay, value extractors) are
+        exempt: structural validation already happened at extraction time, so
+        stoplists and the isolated-POS gate must not second-guess them.
+        ``social_handle.*`` subtypes are also exempt (matched via prefix).
+        """
         if not isinstance(e, dict):
+            return False
+        entity_type = e.get("type", "")
+        if entity_type in _DETERMINISTIC_TYPES or entity_type.startswith("social_handle."):
             return False
         value = e.get("value", "")
         value_lower = value.strip().lower()
