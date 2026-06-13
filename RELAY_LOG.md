@@ -47,3 +47,14 @@ Handoff: first ARCHITECTURE.md (11 decisions); ROADMAP 6 ROUTINE + 1 HARD backed
 ## 2026-06-12 23:30 — executor (sonnet, relay-loop)
 
 Closed 5 of 6 ROUTINE items: a1c2 (deterministic-type scrub exemption), 2b76 (convert hidden-dir skip), 2512 (invoice glued separator), b081 (IBAN lowercase), 4352 (amount currency allowlist); 300 tests pass, 2 remain red (df05 version-tag item, executor-blocked).
+
+## 2026-06-13 — executor (sonnet)
+
+Worked id:df05 — single-sourced PLUGIN_VERSION from importlib.metadata.version("zkm-ner") with
+plugin.yaml fallback for dev installs. Updated root plugin.yaml and src/zkm_ner/plugin.yaml to
+match pyproject.toml; bumped all four carriers from 0.18.1/0.18.0 to 0.19.0 (minor bump per
+loose-0.x rule). Drift-guard tests in test_version_consistency.py all green; full suite 311/311
+pass. Version tag v0.19.0 was created by the repo's autotag commit hook.
+Friction: worktree's uv.sources path = "../.." resolves incorrectly (no zkm there); worked around
+by symlinking .venv from main checkout and running uv sync with absolute path during development,
+reverting to relative path for the commit.
