@@ -64,7 +64,7 @@ test pinning that string) in the same commit.
     dot-dir filter in `scrub()`. No extraction-output change for visible files
     → no `model_version` bump.
 
-- [ ] Single-source the plugin version (pyproject ↔ plugin.yaml ×2 ↔ PLUGIN_VERSION) [ROUTINE] <!-- id:df05 -->
+- [x] Single-source the plugin version (pyproject ↔ plugin.yaml ×2 ↔ PLUGIN_VERSION) [ROUTINE] <!-- id:df05 -->
   - **Acceptance**: `zkm_ner.convert.PLUGIN_VERSION` is derived at import via
     `importlib.metadata.version("zkm-ner")` (fallback: parse the packaged
     `src/zkm_ner/plugin.yaml` when metadata is unavailable); both `plugin.yaml`
