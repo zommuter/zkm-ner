@@ -66,3 +66,7 @@ feat(version): single-source PLUGIN_VERSION from importlib.metadata (id:df05) �
 ## 2026-06-13 15:04 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
 
 review 20260613-1450: 1 commit audited (5510723 docs-only REVIEW_ME annotations) clean; 311 tests green; fixed contract pointer v1→v2 and TODO count 7→1
+
+## 2026-06-13 23:43 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
+
+zkm-ner review: 1 REVIEW_ME-only commit audited clean, 311 tests green, no gaming, 4 resolved boxes pruned, 0 open [ROUTINE]
