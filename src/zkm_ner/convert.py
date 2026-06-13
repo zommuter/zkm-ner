@@ -9,6 +9,7 @@ Returns [] — amender pattern; body output is not produced here.
 
 from __future__ import annotations
 
+import importlib.metadata
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,14 @@ from typing import Any
 from zkm.amendments import apply_queue, emit
 
 PLUGIN_NAME = "ner"
-PLUGIN_VERSION = "0.18.0"
+
+try:
+    PLUGIN_VERSION = importlib.metadata.version("zkm-ner")
+except importlib.metadata.PackageNotFoundError:
+    # Fallback for filesystem/dev install without package metadata.
+    import yaml as _yaml
+    _plugin_yaml = Path(__file__).parent / "plugin.yaml"
+    PLUGIN_VERSION = str(_yaml.safe_load(_plugin_yaml.read_text(encoding="utf-8"))["version"])
 
 
 def convert(store_path: Path, config: dict, *, progress=None, created=None) -> list[Path]:

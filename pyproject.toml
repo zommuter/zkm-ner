@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zkm-ner"
-version = "0.18.1"
+version = "0.19.0"
 description = "zkm amender plugin: NER entity extraction into md frontmatter"
 license = "MIT"
 requires-python = ">=3.11"
