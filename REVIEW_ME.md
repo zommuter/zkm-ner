@@ -13,6 +13,11 @@ Max ~10 open boxes; the reviewer prunes resolved ones each review turn.
   (roadmap:4352) — currency allowlist = full ISO 4217 active-code set ∪
   {BTC, ETH} only. Wider crypto-ticker lists rejected for FP risk (any
   3-letter token would creep back in). Confirm BTC/ETH belong at all.
+  → RESOLVED 2026-06-13 (ner-fp-doctrine mtg, D4, zkm id:f40c): currency is a
+  CLOSED-SET-verifiable type (the allowlist IS the precision gate — no checksum
+  behind it). Freeze at ISO-4217 ∪ {BTC, ETH}. BTC/ETH belong (high corpus
+  signal, crypto-adjacent). Bar for a 3rd crypto code = a logged FP/recall case
+  from the valid:false census (1a6f), documented in ner.md — not intuition.
 
 - [ ] test_convert_hidden_dirs.py::test_created_list_not_filtered
   (roadmap:2b76) — an explicit created= list is honoured verbatim, even for
@@ -24,6 +29,10 @@ Max ~10 open boxes; the reviewer prunes resolved ones each review turn.
   shape-matches are emitted with valid:false when the checksum fails).
   Interpretation: the mod-97 gate on `valid` is sufficient; no extra
   lowercase-only confidence penalty.
+  → RESOLVED 2026-06-13 (ner-fp-doctrine mtg, D3, zkm id:346c): IBAN is
+  CHECKSUM-verifiable ⇒ recall-permissive arm ⇒ ACCEPT lowercase IBANs and emit
+  with valid:false when mod-97 fails. The checksum IS the gate; NO extra
+  lowercase-only confidence penalty. Box confirmed under the doctrine.
 
 - [ ] test_invoice_separator.py::test_no_separator_still_rejected
   (roadmap:2512) — at least one explicit separator character (whitespace or
