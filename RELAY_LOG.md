@@ -58,3 +58,7 @@ pass. Version tag v0.19.0 was created by the repo's autotag commit hook.
 Friction: worktree's uv.sources path = "../.." resolves incorrectly (no zkm there); worked around
 by symlinking .venv from main checkout and running uv sync with absolute path during development,
 reverting to relative path for the commit.
+
+## 2026-06-13 10:03 — executor (sonnet, relay-loop)
+
+feat(version): single-source PLUGIN_VERSION from importlib.metadata (id:df05) — bump 0.18.x→0.19.0, 311/311 tests green
