@@ -88,7 +88,7 @@ Follows the zkm polyrepo rule: every `pyproject.toml` version change is tagged
 `vX.Y.Z` in the same commit (loose-0.x: patch = bugfix only, minor = anything else).
 Bump `plugin.yaml` (both copies) and `PLUGIN_VERSION` together with pyproject.
 
-## Relay contract <!-- fables-executor contract v2 -->
+## Relay contract <!-- relay-executor contract v4 -->
 
-This repo is managed by a reviewer/executor relay. Load the `fables-executor` skill
-(`/fables-executor`) before working on any item, then follow its rules exactly.
+This repo is managed by a reviewer/executor relay. Load `/relay executor` before
+working on any item, then follow its rules exactly.
