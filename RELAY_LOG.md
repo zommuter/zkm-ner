@@ -70,3 +70,7 @@ review 20260613-1450: 1 commit audited (5510723 docs-only REVIEW_ME annotations)
 ## 2026-06-13 23:43 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
 
 zkm-ner review: 1 REVIEW_ME-only commit audited clean, 311 tests green, no gaming, 4 resolved boxes pruned, 0 open [ROUTINE]
+
+## 2026-06-16 20:03 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
+
+zkm-ner handoff: C1 refreshed stale contract pointer v2→v4 (/fables-executor→/relay executor); 311 tests green; HARD id:7b4e left specced (meeting-gated); 0 open ROUTINE
