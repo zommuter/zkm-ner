@@ -111,7 +111,7 @@ test pinning that string) in the same commit.
     `(?:\s*[:\-=])?\s+` tail requires whitespace; rework to require at least one
     separator char (whitespace OR punctuation), not necessarily trailing space.
 
-- [ ] Keep scrub and the extraction cache coherent [HARD — strong model] <!-- id:7b4e -->
+- [ ] Keep scrub and the extraction cache coherent [HARD — meeting] <!-- id:7b4e -->
   - **Why HARD**: cross-component design with real ambiguity. Scrub edits
     frontmatter but cached entity lists keep the removed values, so the next
     full-sweep convert re-emits them and set-union merge resurrects them
