@@ -111,7 +111,7 @@ test pinning that string) in the same commit.
     `(?:\s*[:\-=])?\s+` tail requires whitespace; rework to require at least one
     separator char (whitespace OR punctuation), not necessarily trailing space.
 
-- [ ] Keep scrub and the extraction cache coherent [HARD — meeting] <!-- id:7b4e -->
+- [ ] Keep scrub and the extraction cache coherent [HARD — meeting] — DECIDED 2026-06-23 (zkm/docs/meeting-notes/2026-06-23-1807-zkm-amendments-removal-coherence.md, D1): tombstone + emit_set. Decomposes into id:29ac (core add 'entities' to _SET_FIELDS) + id:0566 (per-store (scope,type,value) tombstone; scrub writes) + id:fa5a (convert filter cached set + emit_set). Run /relay review zkm-ner to emit children as [ROUTINE]. <!-- id:7b4e -->
   - **Why HARD**: cross-component design with real ambiguity. Scrub edits
     frontmatter but cached entity lists keep the removed values, so the next
     full-sweep convert re-emits them and set-union merge resurrects them
