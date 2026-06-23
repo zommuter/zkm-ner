@@ -111,21 +111,63 @@ test pinning that string) in the same commit.
     `(?:\s*[:\-=])?\s+` tail requires whitespace; rework to require at least one
     separator char (whitespace OR punctuation), not necessarily trailing space.
 
-- [ ] Keep scrub and the extraction cache coherent [HARD — meeting] — DECIDED 2026-06-23 (zkm/docs/meeting-notes/2026-06-23-1807-zkm-amendments-removal-coherence.md, D1): tombstone + emit_set. Decomposes into id:29ac (core add 'entities' to _SET_FIELDS) + id:0566 (per-store (scope,type,value) tombstone; scrub writes) + id:fa5a (convert filter cached set + emit_set). Run /relay review zkm-ner to emit children as [ROUTINE]. <!-- id:7b4e -->
-  - **Why HARD**: cross-component design with real ambiguity. Scrub edits
-    frontmatter but cached entity lists keep the removed values, so the next
-    full-sweep convert re-emits them and set-union merge resurrects them
-    (removal logic that lives only in scrub — isolated-POS, verifier verdicts —
-    has no pipeline equivalent). Open questions: rewrite cache entries in place
-    (which model/version variants? recompute combined sha from body+sig+sal?)
-    vs. porting the isolated-POS gate into the pipeline vs. a per-store
-    tombstone list consulted at emit time. Interacts with the deferred
-    amendment replace-mode meeting (central ledger) and N9e's rejected
-    denylist design — needs a reviewer/meeting decision before tests can
-    encode an interpretation.
-  - **Acceptance** (sketch): after `scrub(dry_run=False)` removes an entity, a
-    subsequent `convert(created=None)` on the unchanged store does not re-add
-    it; mechanism documented in ARCHITECTURE.md §5/§6.
+- [x] Keep scrub and the extraction cache coherent [HARD — meeting] — DECIDED 2026-06-23 (zkm/docs/meeting-notes/2026-06-23-1807-zkm-amendments-removal-coherence.md, D1): tombstone + emit_set. Design closed; decomposed into the [ROUTINE] children below (id:0566 + id:fa5a here; id:29ac is core zkm, routed to the shared inbox). <!-- id:7b4e -->
+  - **Decision (D1)**: cache stays **immutable / single-writer** (scrub must NOT
+    rewrite cache entries — breaks idempotence-by-construction, data-loss risk).
+    Instead `scrub(dry_run=False)` writes a per-store tombstone keyed
+    `(scope, type, value)` per removed entity; `convert` filters the cached set
+    through the tombstones and asserts the filtered set via core `emit_set`
+    (mode="set"), whose `_retractable_values` clears the resurrected values from
+    frontmatter. Absorbs both heuristic AND human FP removals. Rejected:
+    scrub-rewrites-cache (b), port-upstream-into-pipeline (can't absorb human FP;
+    verifier-cost blowup), hybrid (two coherence paths). No tombstone-GC until
+    list growth is observed (observe-first).
+
+- [ ] Per-store tombstone store: `scrub(dry_run=False)` records a `(scope,type,value)` tombstone per removed entity [ROUTINE] <!-- id:0566 -->
+  - **Acceptance**: a new `src/zkm_ner/tombstone.py` exposes a `TombstoneStore`
+    persisted under `<store>/.zkm-state/` (per-store, single-writer), keyed on
+    the `(scope, type, value)` triple; `add()` is idempotent (set semantics),
+    `is_tombstoned(scope, type, value)` and `all()` read it back across fresh
+    instances. `scrub(dry_run=False)` writes one tombstone per removed entity
+    (heuristic removals now; verifier-drop removals too); a `dry_run=True` scrub
+    writes NONE. Scope is taken from the removed entity (`body` default,
+    `signature`/`salutation` preserved). Scrub-only / state-file change — no
+    extraction-output change → **no `model_version` bump**. Does NOT touch
+    convert's emit path (that is id:fa5a).
+  - **Tests**: `tests/test_tombstone_store.py` — `test_tombstone_store_roundtrip`,
+    `test_tombstone_key_is_scope_type_value_specific`, `test_tombstone_add_is_idempotent`,
+    `test_tombstone_lives_under_zkm_state`, `test_scrub_writes_tombstone_per_removed_entity`,
+    `test_scrub_dry_run_writes_no_tombstone`, `test_scrub_tombstone_records_entity_scope`
+    (currently RED — no tombstone module yet).
+  - **Done-check**: `uv run pytest tests/test_tombstone_store.py tests/test_scrub.py`
+  - **Context**: `src/zkm_ner/convert.py::scrub` (the `cleaned`/`removed` loop and
+    the `if not dry_run:` write block ~L503). State-dir convention mirrors
+    `zkm.extraction_cache` (`<store>/.zkm-state/<thing>/`). ARCHITECTURE.md §5/§6.
+    Independent of id:fa5a (can land first); id:fa5a consumes this store.
+
+- [ ] convert: filter the cached entity set through tombstones, switch `emit`→`emit_set` [ROUTINE] <!-- id:fa5a -->
+  - **DEPENDS ON id:29ac** (core: add `"entities"` to `zkm.amendments._SET_FIELDS`)
+    AND id:0566 (the tombstone store). Until 29ac lands, `emit_set` on entities is a
+    no-op for retraction — the resurrection-prevention test cannot pass. Do NOT close
+    this item until 29ac is merged in core and `uv sync` picks it up.
+  - **Acceptance**: `convert._process_file` reads the cached entity set, drops any
+    entity whose `(scope, type, value)` is tombstoned (id:0566), and asserts the
+    filtered set via `emit_set` (mode="set") instead of legacy `emit`. The cache
+    is NOT rewritten (single-writer invariant). After `scrub(dry_run=False)` removes
+    an entity, a subsequent full-sweep `convert(created=None)` on the unchanged store
+    (cache hit) does NOT resurrect it through union-merge. Switching emit→emit_set is
+    a behaviour/semantics change to the amendment record (mode) but not to extraction
+    OUTPUT values → confirm whether `model_version` needs a bump (the entity values are
+    unchanged; the cache key is unchanged — **no bump expected**, but state it explicitly
+    in the commit).
+  - **Tests**: `tests/test_convert_tombstone_filter.py` — `test_convert_uses_emit_set_for_entities`,
+    `test_convert_filters_tombstoned_entity_from_emitted_set`,
+    `test_scrub_then_full_sweep_does_not_resurrect` (currently RED).
+  - **Done-check**: `uv run pytest tests/test_convert_tombstone_filter.py tests/test_convert.py`
+  - **Context**: `src/zkm_ner/convert.py` (`emit` import L17 → add `emit_set`; the
+    `emit(...fields={"entities": entities}...)` call in `_process_file`). Core
+    `zkm.amendments.emit_set` is shipped; `_SET_FIELDS` gains `entities` via id:29ac.
+    ARCHITECTURE.md §5/§6.
 
 ## Gated — do NOT execute (listed for visibility only)
 
