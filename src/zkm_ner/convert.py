@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from zkm.amendments import apply_queue, emit
+from zkm.amendments import apply_queue, emit, emit_set
 
 PLUGIN_NAME = "ner"
 
@@ -154,7 +154,28 @@ def _process_file(
     if not entities:
         return
 
-    emit(
+    # Filter the entity set through the per-store tombstone (D1 decision): entities
+    # removed by a prior scrub(dry_run=False) must not be resurrected via cache-hit
+    # union-merge.  The cache is NOT rewritten (single-writer invariant).
+    from zkm_ner.tombstone import TombstoneStore
+    _ts = TombstoneStore(store_path)
+    entities = [
+        e for e in entities
+        if not (
+            isinstance(e, dict)
+            and _ts.is_tombstoned(
+                e.get("scope") or "body",
+                e.get("type", ""),
+                e.get("value", ""),
+            )
+        )
+    ]
+
+    # emit_set (mode="set") declares the complete asserted set; on apply, core
+    # computes removals via diff so scrubbed values are not resurrected.
+    # No model_version bump: entity VALUES are unchanged; only the amendment
+    # record mode changes (emit→emit_set). The cache key is unchanged.
+    emit_set(
         store_path,
         key={"path": str(md_path.relative_to(store_path))},
         fields={"entities": entities},
@@ -377,6 +398,16 @@ def scrub(
             _pilot_fh.flush()
             _pilot_count += 1
 
+    # Lazy per-store tombstone store; created only when dry_run=False removes ≥1 entity.
+    _tombstone_store: "object | None" = None
+
+    def _get_tombstone_store(store_path: Path):  # type: ignore[return]
+        nonlocal _tombstone_store
+        if _tombstone_store is None:
+            from zkm_ner.tombstone import TombstoneStore
+            _tombstone_store = TombstoneStore(store_path)
+        return _tombstone_store
+
     try:
         for i, md_path in enumerate(md_files, 1):
             if progress:
@@ -402,9 +433,11 @@ def scrub(
             body_context: str | None = post.content[:800] if with_verifier else None
 
             cleaned: list = []
+            removed_entities: list = []
             file_verifier_drops = 0
             for e in existing:
                 if _is_heuristic_candidate(e):
+                    removed_entities.append(e)
                     continue  # heuristic removal
                 if (
                     with_verifier
@@ -424,6 +457,7 @@ def scrub(
                     })
                     if verdict == "drop":
                         file_verifier_drops += 1
+                        removed_entities.append(e)
                         continue  # verifier removal
                 cleaned.append(e)
 
@@ -503,6 +537,17 @@ def scrub(
             if not dry_run:
                 post.metadata["entities"] = cleaned
                 write_atomic(md_path, frontmatter.dumps(post))
+                # Record a tombstone for each removed entity so a subsequent
+                # full-sweep convert (id:fa5a) can filter the cached set and
+                # not resurrect them through union-merge (D1 decision).
+                _ts = _get_tombstone_store(store_path)
+                for e in removed_entities:
+                    if isinstance(e, dict):
+                        scope = e.get("scope") or "body"
+                        type_ = e.get("type", "")
+                        value = e.get("value", "")
+                        if type_ and value:
+                            _ts.add(scope, type_, value)
 
             _mark_done()
 
