@@ -90,3 +90,7 @@ zkm-ner review 20260623-172446: 1 commit audited (db38ff0, ROADMAP-only) — /me
 ## 2026-06-23 19:44 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
 
 zkm-ner review: emit id:7b4e D1 decomposition — closed HARD parent, added [ROUTINE] children 0566 (tombstone store) + fa5a (convert filter+emit_set) with 10 red specs; core 29ac routed to inbox; 311/311 baseline green, gaming-scan+lint clean
+
+## 2026-06-24 20:58 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
+
+review zkm-ner: cleared stale id:7b4e route:human gate (children id:0566+id:fa5a already promoted as open [ROUTINE]); gaming/lint/doctor clean
