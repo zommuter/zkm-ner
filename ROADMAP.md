@@ -111,7 +111,7 @@ test pinning that string) in the same commit.
     `(?:\s*[:\-=])?\s+` tail requires whitespace; rework to require at least one
     separator char (whitespace OR punctuation), not necessarily trailing space.
 
-- [x] Keep scrub and the extraction cache coherent [HARD — decision gate] — DECIDED 2026-06-23 (zkm/docs/meeting-notes/2026-06-23-1807-zkm-amendments-removal-coherence.md, D1): tombstone + emit_set. Design closed; decomposed into the [ROUTINE] children below (id:0566 + id:fa5a here; id:29ac is core zkm, routed to the shared inbox). — 🚧 GATED (auto, id:3801; route:human): DECIDED [HARD — meeting] with 3 decomposed child seams not yet promoted to ROADMAP; needs /relay review zkm-ner to emit children as [ROUTINE] — needs /relay human <!-- id:7b4e -->
+- [x] Keep scrub and the extraction cache coherent [HARD — meeting] — DECIDED 2026-06-23 (zkm/docs/meeting-notes/2026-06-23-1807-zkm-amendments-removal-coherence.md, D1): tombstone + emit_set. Design closed; decomposed into the [ROUTINE] children below (id:0566 + id:fa5a here; id:29ac is core zkm, routed to the shared inbox). — gate cleared 2026-06-24 (relay review): the 3 decomposed child seams ARE promoted — id:0566 + id:fa5a are open [ROUTINE] items in this ROADMAP with red specs (tests/test_tombstone_store.py, tests/test_convert_tombstone_filter.py confirmed RED), id:29ac routed to the core zkm inbox. The id:3801 dirty-guard residue re-applied a stale gate whose unblock condition was already satisfied. <!-- id:7b4e -->
   - **Decision (D1)**: cache stays **immutable / single-writer** (scrub must NOT
     rewrite cache entries — breaks idempotence-by-construction, data-loss risk).
     Instead `scrub(dry_run=False)` writes a per-store tombstone keyed
