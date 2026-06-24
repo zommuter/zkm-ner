@@ -90,3 +90,11 @@ zkm-ner review 20260623-172446: 1 commit audited (db38ff0, ROADMAP-only) — /me
 ## 2026-06-23 19:44 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
 
 zkm-ner review: emit id:7b4e D1 decomposition — closed HARD parent, added [ROUTINE] children 0566 (tombstone store) + fa5a (convert filter+emit_set) with 10 red specs; core 29ac routed to inbox; 311/311 baseline green, gaming-scan+lint clean
+
+## 2026-06-24 — executor (sonnet)
+
+Worked id:0566 and id:fa5a — both ROUTINE items closed.
+id:0566: created `src/zkm_ner/tombstone.py` with `TombstoneStore` persisted as JSONL under `<store>/.zkm-state/tombstones.jsonl`. Set semantics (idempotent add); key is `(scope, type, value)`. Modified `scrub()` to collect removed entities in `removed_entities` list and write tombstones via a lazy `_get_tombstone_store()` on `not dry_run` — both heuristic and verifier-drop removals recorded; dry-run writes nothing. 7/7 test_tombstone_store.py tests green.
+id:fa5a: added `emit_set` to imports; modified `_process_file` to load `TombstoneStore` and filter entities by tombstone before emitting; switched from `emit` to `emit_set` (mode="set") so core's `_retractable_values` diffs and drops stale values. Cache not rewritten (single-writer invariant). No model_version bump (entity values unchanged). 3/3 test_convert_tombstone_filter.py tests green.
+Full suite: 321/321 pass (up from 318 with 3 red). Both items ticked in ROADMAP.md.
+Friction: worktree uv.sources path="../.." artifact (known since 2026-06-13) blocked `uv run` from worktree; worked around by symlinking main checkout's .venv into worktree and using PYTHONPATH to prioritize worktree's src/ over editable install.
