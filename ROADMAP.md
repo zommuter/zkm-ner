@@ -123,7 +123,7 @@ test pinning that string) in the same commit.
     verifier-cost blowup), hybrid (two coherence paths). No tombstone-GC until
     list growth is observed (observe-first).
 
-- [ ] Per-store tombstone store: `scrub(dry_run=False)` records a `(scope,type,value)` tombstone per removed entity [ROUTINE] <!-- id:0566 -->
+- [x] Per-store tombstone store: `scrub(dry_run=False)` records a `(scope,type,value)` tombstone per removed entity [ROUTINE] <!-- id:0566 -->
   - **Acceptance**: a new `src/zkm_ner/tombstone.py` exposes a `TombstoneStore`
     persisted under `<store>/.zkm-state/` (per-store, single-writer), keyed on
     the `(scope, type, value)` triple; `add()` is idempotent (set semantics),
@@ -145,7 +145,7 @@ test pinning that string) in the same commit.
     `zkm.extraction_cache` (`<store>/.zkm-state/<thing>/`). ARCHITECTURE.md §5/§6.
     Independent of id:fa5a (can land first); id:fa5a consumes this store.
 
-- [ ] convert: filter the cached entity set through tombstones, switch `emit`→`emit_set` [ROUTINE] <!-- id:fa5a -->
+- [x] convert: filter the cached entity set through tombstones, switch `emit`→`emit_set` [ROUTINE] <!-- id:fa5a -->
   - **DEPENDS ON id:29ac** (core: add `"entities"` to `zkm.amendments._SET_FIELDS`)
     AND id:0566 (the tombstone store). Until 29ac lands, `emit_set` on entities is a
     no-op for retraction — the resurrection-prevention test cannot pass. Do NOT close

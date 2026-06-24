@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from zkm.amendments import apply_queue, emit
+from zkm.amendments import apply_queue, emit, emit_set
 
 PLUGIN_NAME = "ner"
 
@@ -154,7 +154,28 @@ def _process_file(
     if not entities:
         return
 
-    emit(
+    # Filter the entity set through the per-store tombstone (D1 decision): entities
+    # removed by a prior scrub(dry_run=False) must not be resurrected via cache-hit
+    # union-merge.  The cache is NOT rewritten (single-writer invariant).
+    from zkm_ner.tombstone import TombstoneStore
+    _ts = TombstoneStore(store_path)
+    entities = [
+        e for e in entities
+        if not (
+            isinstance(e, dict)
+            and _ts.is_tombstoned(
+                e.get("scope") or "body",
+                e.get("type", ""),
+                e.get("value", ""),
+            )
+        )
+    ]
+
+    # emit_set (mode="set") declares the complete asserted set; on apply, core
+    # computes removals via diff so scrubbed values are not resurrected.
+    # No model_version bump: entity VALUES are unchanged; only the amendment
+    # record mode changes (emit→emit_set). The cache key is unchanged.
+    emit_set(
         store_path,
         key={"path": str(md_path.relative_to(store_path))},
         fields={"entities": entities},
