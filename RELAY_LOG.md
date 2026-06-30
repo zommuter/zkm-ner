@@ -109,3 +109,7 @@ executor 2026-06-24: closed id:0566 (TombstoneStore) + id:fa5a (convert tombston
 ## 2026-06-26 09:43 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
 
 review: audit window clean (1 conformance commit); reconciled TODO id:9c46 (ROADMAP drained, id:0566+id:fa5a closed); 321/321 green
+
+## 2026-06-30 12:19 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
+
+review: Option-B TODO migration verified legit, ROADMAP drained + 321 tests green; b99e/f40c left as /meeting candidates (target core docs/ner.md) [id:b99e,f40c]
