@@ -171,8 +171,9 @@ test pinning that string) in the same commit.
 
 ## Gated — do NOT execute (listed for visibility only)
 
-- **Temporal NER L2+L3 design note** (central ledger id:6f3a) — gated on L1
+- **Temporal NER L2+L3 design note** (TODO id:6f3a) — gated on L1
   open-set noise being measured. Design-note work, lives in core
   `docs/entity-model.md`, not here.
-- **N9e closed-loop learned denylist** — gate cannot fire (N9d closed via
-  Gate C; requires ≥5 verifier-override cases). No tests, no infrastructure.
+- **N9e closed-loop learned denylist** (TODO id:5a0b) — gate cannot
+  fire (N9d closed via Gate C; requires ≥5 verifier-override cases). No tests,
+  no infrastructure.
