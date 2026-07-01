@@ -113,3 +113,7 @@ review: audit window clean (1 conformance commit); reconciled TODO id:9c46 (ROAD
 ## 2026-06-30 12:19 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
 
 review: Option-B TODO migration verified legit, ROADMAP drained + 321 tests green; b99e/f40c left as /meeting candidates (target core docs/ner.md) [id:b99e,f40c]
+
+## 2026-07-01 23:17 — reviewer (claude-fable-5, relay-loop)
+
+Fable recheck of Opus stand-in windows: clean — tombstone work (0566/fa5a) genuine, 321/321 green; contract pointer v4→v6, Gated id:5a0b token fix; ROADMAP stays drained [id:0566,fa5a,5a0b]
