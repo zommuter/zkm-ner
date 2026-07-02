@@ -19,3 +19,10 @@ their roadmap items (a1c2, 2b76, 2512, df05) are closed and verified green.
   closed ROADMAP item id:4352 — only the `ner.md` documentation remains.
   (Review 2026-06-30; relay-doctor flagged "ROADMAP drained, 3 unpromoted TODO" —
   5a0b/6f3a are already in ROADMAP's Gated section, this box covers b99e+f40c.)
+  **Update 2026-07-02 (review):** an apex DQ triage (commit e7eb3ce) lane-tagged
+  both items `[ROUTINE]` without resolving this placement question — that tag
+  would have made unpromoted-scan demand a handoff promoting un-executable
+  cross-repo specs into this ROADMAP. Review retagged both to `[HARD — meeting]`
+  (verified `docs/ner.md` exists only in core zkm; this repo has no `docs/`).
+  The /meeting placement decision above is still the unblock; if it chooses
+  "route to core", close both here with a pointer and inbox-route the doc edits.

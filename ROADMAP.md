@@ -177,3 +177,9 @@ test pinning that string) in the same commit.
 - **N9e closed-loop learned denylist** (TODO id:5a0b) — gate cannot
   fire (N9d closed via Gate C; requires ≥5 verifier-override cases). No tests,
   no infrastructure.
+- **§Precision doctrine + currency extension bar in `ner.md`** (TODO id:b99e +
+  id:f40c, `[HARD — meeting]`) — gated on a placement decision: the target file
+  `docs/ner.md` lives in **core zkm**, not this repo, so a zkm-ner executor
+  cannot edit it (relay invariant: no cross-repo edits). See the REVIEW_ME box.
+  An apex DQ triage tagged them `[ROUTINE]` 2026-07-02; review retagged to
+  `[HARD — meeting]` the same day (mis-tag — un-executable here as written).
