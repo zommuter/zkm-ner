@@ -117,3 +117,7 @@ review: Option-B TODO migration verified legit, ROADMAP drained + 321 tests gree
 ## 2026-07-01 23:17 — reviewer (claude-fable-5, relay-loop)
 
 Fable recheck of Opus stand-in windows: clean — tombstone work (0566/fa5a) genuine, 321/321 green; contract pointer v4→v6, Gated id:5a0b token fix; ROADMAP stays drained [id:0566,fa5a,5a0b]
+
+## 2026-07-02 08:43 — reviewer (claude-fable-5, relay-loop)
+
+review: spurious dispatch (path-override drop, 3rd instance of routed:3715 this run) — repo already clean at relay-ckpt-20260701-2317, 0 commits since; 321/321 green re-confirmed, gaming-scan/lint/cross-ledger clean, ROADMAP drained (0 ROUTINE), no ledger changes
