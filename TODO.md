@@ -12,5 +12,3 @@ This is the work ledger for zkm-ner (Option B, decided 2026-06-30 — `~/src/zkm
 - [ ] [HARD — meeting] **zkm-ner currency (4352)** — freeze allowlist at ISO-4217 ∪ {BTC, ETH} (code half SHIPPED as ROADMAP id:4352); document the census-logged extension bar in `ner.md`. 🚧 same placement gate as id:b99e — `ner.md` is a core-zkm file (retagged from apex-triage [ROUTINE] by relay review 2026-07-02) <!-- id:f40c -->
 
 ## Done
-- [x] Relay: ROADMAP drained — id:0566 + id:fa5a both closed [ROUTINE] (scrub↔cache coherence; id:7b4e decided+decomposed 2026-06-23, core prereq id:29ac routed to inbox) on 2026-06-26 <!-- id:9c46 -->
-- [x] feat(amender): accept `created=` kwarg to restrict sweep to triggered files — tests passing (test_convert.py) on 2026-06-11
