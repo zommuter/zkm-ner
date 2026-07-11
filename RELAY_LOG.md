@@ -125,3 +125,7 @@ review: spurious dispatch (path-override drop, 3rd instance of routed:3715 this 
 ## 2026-07-02 09:22 — reviewer (claude-fable-5, relay-loop)
 
 review: caught apex DQ mis-tag — retag b99e+f40c [ROUTINE]->[HARD — meeting] (docs/ner.md is core-zkm-only, un-executable here; placement /meeting gate stands); 321/321 green, gaming-scan clean, ROADMAP stays drained [id:b99e,f40c]
+
+## 2026-07-11 13:49 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
+
+review zkm-ner: window = ledger housekeeping only (archive closed items + [HARD→INPUT — meeting] lane migration); suite 321/0 green, gaming-scan clean, roadmap-lint/relay-doctor clean; synced ROADMAP Gated tag; 0 open [ROUTINE] [id:b99e,f40c]
