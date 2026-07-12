@@ -133,3 +133,7 @@ review zkm-ner: window = ledger housekeeping only (archive closed items + [HARD�
 ## 2026-07-12 21:21 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
 
 review zkm-ner: window = single inbox-ingest commit (TODO +1: routed:fa25 md-table entity item). gaming-scan/roadmap-lint/relay-doctor/cross-ledger/todo-conformance all clean; no src/ or tests/ change so suite stays 321/321 green (SKIPPED-TIER pytest in-worktree — known `uv.sources path="../.."` artifact, no green claim rests on it). Reverse-handoff (§5b): qualified new id:a4bd — design-judgment, NOT promoted; approach fork (zkm-ner textfilter class-8 vs zkm-inventory amender-exclude) + precision/recall doctrine call → tagged [INPUT — meeting], REVIEW_ME box added as /meeting candidate. ROADMAP stays drained (0 open [ROUTINE]) [id:a4bd]
+
+## 2026-07-12 21:23 — reviewer (claude-opus-4-8, fable-standin, relay-loop)
+
+review zkm-ner: inbox-ingest-only window, all scans clean, suite stays 321/321; reverse-handoff qualified new id:a4bd as [INPUT — meeting] /meeting candidate; ROADMAP drained [id:a4bd]
