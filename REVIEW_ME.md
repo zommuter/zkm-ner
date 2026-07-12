@@ -26,3 +26,21 @@ their roadmap items (a1c2, 2b76, 2512, df05) are closed and verified green.
   (verified `docs/ner.md` exists only in core zkm; this repo has no `docs/`).
   The /meeting placement decision above is still the unblock; if it chooses
   "route to core", close both here with a pointer and inbox-route the doc edits.
+
+- [ ] **a4bd (routed:fa25 from zkm-inventory) — md-table entity extraction: /meeting
+  candidate, NOT a promotable [ROUTINE].** zkm-inventory's drive/device markdown tables
+  make the amender emit spurious `scope:body` org/person entities from pipe-table header
+  and data cells (Value/Location/Status), and the write-back then breaks CLI-level
+  idempotence of downstream converts. Two genuinely divergent fixes: **(A)** zkm-ner side
+  — extend `textfilter.py` with a new "class-8" table-cell filter (natural home: the file
+  already has class-1/5/7 pipe/separator/empty-cell filters, so an executor would slot it
+  there); **(B)** zkm-inventory side — `amender-exclude` the inventory md so it never runs
+  NER over structural tables. (A) also carries a precision/recall sub-judgment: dropping
+  *header* tokens is safe, but blanket-excluding *all* table cells would silently drop
+  legitimate entities that live inside data tables (a contacts/asset table listing real
+  people/orgs) — exactly the class of call the NER **precision doctrine** (id:b99e, still
+  meeting-gated on placement) governs. Because (A)-vs-(B) is cross-repo and the "which
+  tokens" line is a doctrine call, the reviewer left it in TODO as `[INPUT — meeting]`
+  rather than writing a red spec that would prematurely commit to approach (A). Meeting
+  should pick A/B and, if A, the drop granularity (header-only vs cell-content heuristic).
+  (Qualified — reverse-handoff — by relay review 2026-07-12.)
